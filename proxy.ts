@@ -9,16 +9,14 @@ export default auth((req) => {
     nextUrl.pathname.startsWith("/login") ||
     nextUrl.pathname.startsWith("/register") ||
     nextUrl.pathname.startsWith("/api/auth") ||
-    nextUrl.pathname.startsWith("/api/register");
+    nextUrl.pathname.startsWith("/api/register") ||
+    nextUrl.pathname.startsWith("/api/admin/setup");
 
   if (!isLoggedIn && !isPublicPath) {
     return NextResponse.redirect(new URL("/login", nextUrl));
   }
 
-  if (
-    isLoggedIn &&
-    (nextUrl.pathname === "/login" || nextUrl.pathname === "/register")
-  ) {
+  if (isLoggedIn && (nextUrl.pathname === "/login" || nextUrl.pathname === "/register")) {
     return NextResponse.redirect(new URL("/", nextUrl));
   }
 

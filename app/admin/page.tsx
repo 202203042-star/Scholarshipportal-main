@@ -1,11 +1,10 @@
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import AdminClient from "./AdminClient";
+import AdminDashboard from "./AdminDashboard";
 
 export default async function AdminPage() {
   const session = await auth();
   if (!session) redirect("/login");
-  if ((session.user as { role?: string }).role !== "admin") redirect("/dashboard");
-
-  return <AdminClient />;
+  if ((session.user as { role?: string }).role !== "admin") redirect("/");
+  return <AdminDashboard />;
 }

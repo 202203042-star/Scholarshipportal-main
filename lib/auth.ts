@@ -5,7 +5,6 @@ import connectDB from "./mongodb";
 import User from "@/models/User";
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
-  trustHost: true,
   providers: [
     CredentialsProvider({
       name: "credentials",
@@ -14,19 +13,25 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         password: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) return null;
+        if (!credentials?.email || !credentials?.password) {
+          console.log("❌ Credentials missing");
+          return null;
+        }
 
         try {
           await connectDB();
-          const user = await User.findOne({ email: credentials.email });
+          console.log("✅ DB connected");
 
-          if (!user) return null;
-          if (!user.password) return null;
+          const user = await User.findOne({ email: credentials.email });
+          console.log("👤 User found:", user ? user.email : "NOT FOUND");
+
+          if (!user || !user.password) return null;
 
           const isValid = await bcrypt.compare(
             credentials.password as string,
             user.password
           );
+          console.log("🔑 Password valid:", isValid);
 
           if (!isValid) return null;
 
@@ -35,10 +40,9 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             name: user.name,
             email: user.email,
             role: user.role,
-            image: user.image,
           };
         } catch (error) {
-          console.error("Auth error:", error);
+          console.error("🔴 Auth error:", error);
           return null;
         }
       },
@@ -47,16 +51,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
-        try {
-          await connectDB();
-          const dbUser = await User.findOne({ email: token.email });
-          if (dbUser) {
-            token.id = dbUser._id.toString();
-            token.role = dbUser.role;
-          }
-        } catch (error) {
-          console.error("JWT error:", error);
-        }
+        token.id = user.id;
+        token.role = (user as { role?: string }).role;
       }
       return token;
     },

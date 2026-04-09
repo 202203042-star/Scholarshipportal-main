@@ -4,11 +4,13 @@ import { useState } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { GraduationCap, Mail, Lock, Eye, EyeOff, Loader2 } from "lucide-react";
+import { GraduationCap, Mail, Lock, Eye, EyeOff, Loader2, Shield } from "lucide-react";
 
 export default function LoginPage() {
   const router = useRouter();
+  const [role, setRole] = useState<"student" | "admin">("student");
   const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPass, setShowPass] = useState(false);
   const [error, setError] = useState("");
@@ -19,17 +21,23 @@ export default function LoginPage() {
     setLoading(true);
     setError("");
 
+    const loginEmail = role === "admin" ? `admin_${username}@scholarhub.admin` : email;
+
     const res = await signIn("credentials", {
-      email,
+      email: loginEmail,
       password,
       redirect: false,
     });
 
     if (res?.error) {
-      setError("Email ya password galat hai. Pehle register karein.");
+      setError(role === "admin" ? "Username ya password galat hai" : "Email ya password galat hai. Pehle register karein.");
       setLoading(false);
     } else {
-      router.push("/");
+      if (role === "admin") {
+        router.push("/admin");
+      } else {
+        router.push("/");
+      }
     }
   }
 
@@ -37,108 +45,110 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-indigo-50 px-4">
       <div className="w-full max-w-md">
 
-        {/* Logo */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl mb-4"
             style={{background:"linear-gradient(135deg,#1d4ed8,#4f46e5)"}}>
             <GraduationCap className="text-white" size={32} />
           </div>
           <h1 className="text-3xl font-bold text-gray-900">ScholarHub</h1>
-          <p className="text-gray-500 mt-1 text-sm">Find & Apply for Scholarships</p>
+          <p className="text-gray-500 mt-1 text-sm">Scholarship Portal — Gujarat & Central</p>
         </div>
 
-        {/* Card */}
+        {/* Role Toggle */}
+        <div className="flex rounded-2xl overflow-hidden border border-gray-200 mb-6 bg-white shadow-sm">
+          <button
+            onClick={() => { setRole("student"); setError(""); }}
+            className={`flex-1 py-3 text-sm font-bold transition-all flex items-center justify-center gap-2 ${role === "student" ? "text-white" : "text-gray-500 hover:bg-gray-50"}`}
+            style={role === "student" ? {background:"linear-gradient(135deg,#1d4ed8,#4f46e5)"} : {}}>
+            🎓 Student Login
+          </button>
+          <button
+            onClick={() => { setRole("admin"); setError(""); }}
+            className={`flex-1 py-3 text-sm font-bold transition-all flex items-center justify-center gap-2 ${role === "admin" ? "text-white" : "text-gray-500 hover:bg-gray-50"}`}
+            style={role === "admin" ? {background:"linear-gradient(135deg,#7c3aed,#6d28d9)"} : {}}>
+            <Shield size={14} /> Admin Login
+          </button>
+        </div>
+
         <div className="bg-white rounded-3xl shadow-xl border border-gray-100 p-8">
-          <h2 className="text-2xl font-bold text-gray-900 mb-1">Welcome back</h2>
-          <p className="text-gray-500 text-sm mb-6">Sign in to your account</p>
+          <h2 className="text-2xl font-bold text-gray-900 mb-1">
+            {role === "student" ? "Welcome back!" : "Admin Portal"}
+          </h2>
+          <p className="text-gray-500 text-sm mb-6">
+            {role === "student" ? "Sign in to your student account" : "Restricted access — admins only"}
+          </p>
 
           {error && (
             <div className="flex items-start gap-3 bg-red-50 border border-red-200 text-red-700 rounded-2xl px-4 py-3 text-sm mb-5">
-              <span className="text-red-500 mt-0.5 flex-shrink-0">⚠️</span>
-              <div>
-                <p className="font-medium">Login failed</p>
-                <p className="text-red-500 text-xs mt-0.5">{error}</p>
-              </div>
+              <span className="mt-0.5 flex-shrink-0">⚠️</span>
+              <p>{error}</p>
             </div>
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Email */}
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                Email Address
-              </label>
-              <div className="relative">
-                <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-                <input
-                  type="email"
-                  required
-                  value={email}
-                  onChange={e => setEmail(e.target.value)}
-                  placeholder="you@example.com"
-                  className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50 hover:bg-white transition-colors"
-                />
+            {role === "student" ? (
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1.5">Email Address</label>
+                <div className="relative">
+                  <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                  <input
+                    type="email" required value={email}
+                    onChange={e => setEmail(e.target.value)}
+                    placeholder="you@example.com"
+                    className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 hover:bg-white transition-colors"
+                  />
+                </div>
               </div>
-            </div>
+            ) : (
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1.5">Admin Username</label>
+                <div className="relative">
+                  <Shield className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                  <input
+                    type="text" required value={username}
+                    onChange={e => setUsername(e.target.value)}
+                    placeholder="admin username"
+                    className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 bg-gray-50 hover:bg-white transition-colors"
+                  />
+                </div>
+              </div>
+            )}
 
-            {/* Password */}
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                Password
-              </label>
+              <label className="block text-sm font-semibold text-gray-700 mb-1.5">Password</label>
               <div className="relative">
                 <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
                 <input
-                  type={showPass ? "text" : "password"}
-                  required
-                  value={password}
+                  type={showPass ? "text" : "password"} required value={password}
                   onChange={e => setPassword(e.target.value)}
-                  placeholder="Enter your password"
-                  className="w-full pl-10 pr-11 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50 hover:bg-white transition-colors"
+                  placeholder="Enter password"
+                  className="w-full pl-10 pr-11 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 hover:bg-white transition-colors"
                 />
-                <button
-                  type="button"
-                  onClick={() => setShowPass(!showPass)}
-                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
-                >
+                <button type="button" onClick={() => setShowPass(!showPass)}
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
                   {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
               </div>
             </div>
 
-            <div className="flex justify-end">
-              <button type="button" className="text-xs text-blue-600 hover:text-blue-700 font-medium">
-                Forgot password?
-              </button>
-            </div>
-
-            <button
-              type="submit"
-              disabled={loading}
+            <button type="submit" disabled={loading}
               className="w-full py-3 rounded-xl text-sm font-bold text-white transition-all hover:opacity-90 active:scale-[0.98] disabled:opacity-60 flex items-center justify-center gap-2"
-              style={{background:"linear-gradient(135deg,#1d4ed8,#4f46e5)"}}
-            >
-              {loading ? (
-                <><Loader2 className="animate-spin" size={16} /> Signing in...</>
-              ) : (
-                "Sign In"
-              )}
+              style={{background: role === "admin" ? "linear-gradient(135deg,#7c3aed,#6d28d9)" : "linear-gradient(135deg,#1d4ed8,#4f46e5)"}}>
+              {loading ? <><Loader2 className="animate-spin" size={16} /> Signing in...</> : "Sign In"}
             </button>
           </form>
 
-          <div className="mt-6 pt-5 border-t border-gray-100 text-center">
-            <p className="text-sm text-gray-500">
-              Don't have an account?{" "}
-              <Link href="/register" className="text-blue-600 font-semibold hover:text-blue-700">
-                Create account
-              </Link>
-            </p>
-          </div>
+          {role === "student" && (
+            <div className="mt-6 pt-5 border-t border-gray-100 text-center">
+              <p className="text-sm text-gray-500">
+                Don't have an account?{" "}
+                <Link href="/register" className="text-blue-600 font-semibold hover:text-blue-700">
+                  Create account
+                </Link>
+              </p>
+            </div>
+          )}
         </div>
-
-        <p className="text-center text-xs text-gray-400 mt-6">
-          Scholarship Portal • Gujarat Government & Central Schemes
-        </p>
       </div>
     </div>
   );

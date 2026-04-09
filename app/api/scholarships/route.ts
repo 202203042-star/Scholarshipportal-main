@@ -1,63 +1,29 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
 import connectDB from "@/lib/mongodb";
 import Scholarship from "@/models/Scholarship";
-import User from "@/models/User";
+import { auth } from "@/lib/auth";
 
-// GET - Saari scholarships fetch karo
 export async function GET() {
-  await connectDB();
-  const scholarships = await Scholarship.find({ isActive: true }).sort({
-    deadline: 1,
-  });
-  return NextResponse.json({ scholarships });
+  try {
+    await connectDB();
+    const scholarships = await Scholarship.find({}).sort({ createdAt: -1 });
+    return NextResponse.json({ scholarships });  // ← ye fix hai
+  } catch (error) {
+    return NextResponse.json({ scholarships: [], error: "DB error" }, { status: 500 });
+  }
 }
 
-// POST - Admin scholarship banaye
 export async function POST(req: NextRequest) {
-  const session = await auth();
-  if (!session?.user || (session.user as { role?: string }).role !== "admin") {
-    return NextResponse.json({ error: "Sirf admin kar sakta hai" }, { status: 403 });
+  try {
+    const session = await auth();
+    if (!session || (session.user as any)?.role !== "admin") {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    await connectDB();
+    const body = await req.json();
+    const scholarship = await Scholarship.create(body);
+    return NextResponse.json({ scholarship, message: "Scholarship add ho gayi!" }, { status: 201 });
+  } catch (error) {
+    return NextResponse.json({ error: "Kuch galat hua" }, { status: 500 });
   }
-
-  const body = await req.json();
-  await connectDB();
-
-  const scholarship = await Scholarship.create({
-    ...body,
-    createdBy: (session.user as { id?: string }).id,
-  });
-
-  return NextResponse.json({ message: "Scholarship add ho gayi!", scholarship }, { status: 201 });
-}
-
-// PATCH - Student scholarship ke liye apply kare
-export async function PATCH(req: NextRequest) {
-  const session = await auth();
-  if (!session?.user?.email) {
-    return NextResponse.json({ error: "Login karo pehle" }, { status: 401 });
-  }
-
-  const { scholarshipId } = await req.json();
-  await connectDB();
-
-  const user = await User.findOne({ email: session.user.email });
-  const scholarship = await Scholarship.findById(scholarshipId);
-
-  if (!scholarship) {
-    return NextResponse.json({ error: "Scholarship nahi mili" }, { status: 404 });
-  }
-
-  if (user.appliedScholarships.includes(scholarshipId)) {
-    return NextResponse.json({ error: "Pehle se apply kar chuke ho" }, { status: 400 });
-  }
-
-  await User.findByIdAndUpdate(user._id, {
-    $push: { appliedScholarships: scholarshipId },
-  });
-  await Scholarship.findByIdAndUpdate(scholarshipId, {
-    $push: { applicants: user._id },
-  });
-
-  return NextResponse.json({ message: "Apply ho gaya! 🎉" });
 }
