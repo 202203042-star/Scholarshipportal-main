@@ -46,7 +46,7 @@ export default function ProfilePage() {
       body: JSON.stringify(profile),
     });
     const data = await res.json();
-    setMsg(data.message || "Update ho gaya!");
+    setMsg(data.message || "Updated successfully!");
     setSaving(false);
   }
 
@@ -66,9 +66,9 @@ export default function ProfilePage() {
       </nav>
 
       <div className="max-w-2xl mx-auto px-6 py-8">
-        <h2 className="text-2xl font-semibold text-gray-900 mb-1">Aapki Profile</h2>
+        <h2 className="text-2xl font-semibold text-gray-900 mb-1">Your Profile</h2>
         <p className="text-gray-500 text-sm mb-6">
-          Profile update karein / પ્રોફાઇલ અપડેટ કરો
+          Update your profile / પ્રોફાઇલ અપડેટ કરો
         </p>
 
         {msg && (
@@ -80,7 +80,7 @@ export default function ProfilePage() {
         <form onSubmit={handleSave} className="bg-white border border-gray-200 rounded-xl p-6 space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Naam / Name</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
               <input type="text" value={profile.name || ""} onChange={e => setProfile({...profile, name: e.target.value})}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
             </div>
@@ -126,9 +126,9 @@ export default function ProfilePage() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Address / સરનામું</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
             <textarea value={profile.address || ""} onChange={e => setProfile({...profile, address: e.target.value})}
-              rows={2} placeholder="Ghar ka address"
+              rows={2} placeholder="Enter your address"
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
           </div>
 
@@ -157,7 +157,7 @@ export default function ProfilePage() {
 
           <button type="submit" disabled={saving}
             className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 rounded-lg text-sm transition disabled:opacity-50">
-            {saving ? "Saving..." : "Profile Save Karein / સાચવો"}
+            {saving ? "Saving..." : "Save Profile / સાચવો"}
           </button>
         </form>
       </div>

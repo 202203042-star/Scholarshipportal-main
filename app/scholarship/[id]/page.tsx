@@ -33,7 +33,7 @@ export default function ScholarshipsPage() {
       window.open(applyLink, "_blank");
       return;
     }
-    if (!session) { setMsg("Pehle login karein"); return; }
+    if (!session) { setMsg("Please login first"); return; }
     setApplying(id);
     const res = await fetch("/api/scholarships", {
       method: "PATCH",
@@ -59,7 +59,7 @@ export default function ScholarshipsPage() {
           Available Scholarships
         </h2>
         <p className="text-gray-500 text-sm mb-6">
-          Scholarship ke liye apply karein / છાત્રવૃત્તિ માટે અરજી કરો
+          Apply for a scholarship / છાત્રવૃત્તિ માટે અરજી કરો
         </p>
 
         {msg && (
@@ -93,13 +93,13 @@ export default function ScholarshipsPage() {
                   disabled={applying === s._id}
                   className="w-full bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium py-2 rounded-lg transition disabled:opacity-50"
                 >
-                  {applying === s._id ? "Applying..." : s.applyLink ? "Official Website par Apply Karein ↗" : "Apply Karein / અરજી કરો"}
+                  {applying === s._id ? "Applying..." : s.applyLink ? "Apply on Official Website ↗" : "Apply / અરજી કરો"}
                 </button>
               </div>
             ))}
             {scholarships.length === 0 && (
               <p className="text-gray-400 text-center py-12 col-span-2">
-                Koi scholarship available nahi hai abhi
+                No scholarships available at the moment
               </p>
             )}
           </div>

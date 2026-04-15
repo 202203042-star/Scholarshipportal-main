@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
       gender: body.gender || "Any",
       income: Number(body.income) || 999999999,
     });
-    return NextResponse.json({ message: "Scholarship add ho gayi!", scholarship }, { status: 201 });
+    return NextResponse.json({ message: "Scholarship added successfully!", scholarship }, { status: 201 });
   } catch (error) {
     console.error(error);
     return NextResponse.json({ error: "Server error" }, { status: 500 });
@@ -60,7 +60,7 @@ export async function PUT(req: NextRequest) {
       },
       { new: true }
     );
-    return NextResponse.json({ message: "Update ho gaya!", scholarship });
+    return NextResponse.json({ message: "Updated successfully!", scholarship });
   } catch (error) {
     console.error(error);
     return NextResponse.json({ error: "Server error" }, { status: 500 });
@@ -73,7 +73,7 @@ export async function DELETE(req: NextRequest) {
     const { id } = await req.json();
     await connectDB();
     await Scholarship.findByIdAndDelete(id);
-    return NextResponse.json({ message: "Delete ho gaya!" });
+    return NextResponse.json({ message: "Deleted successfully!" });
   } catch (error) {
     console.error(error);
     return NextResponse.json({ error: "Server error" }, { status: 500 });

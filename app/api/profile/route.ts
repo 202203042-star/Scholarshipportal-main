@@ -3,11 +3,11 @@ import { auth } from "@/lib/auth";
 import connectDB from "@/lib/mongodb";
 import User from "@/models/User";
 
-// GET - Profile fetch karo
+// GET - Fetch user profile
 export async function GET() {
   const session = await auth();
   if (!session?.user?.email) {
-    return NextResponse.json({ error: "Login karo pehle" }, { status: 401 });
+    return NextResponse.json({ error: "Please login first" }, { status: 401 });
   }
 
   await connectDB();
@@ -18,11 +18,11 @@ export async function GET() {
   return NextResponse.json({ user });
 }
 
-// PUT - Profile update karo
+// PUT - Update user profile
 export async function PUT(req: NextRequest) {
   const session = await auth();
   if (!session?.user?.email) {
-    return NextResponse.json({ error: "Login karo pehle" }, { status: 401 });
+    return NextResponse.json({ error: "Please login first" }, { status: 401 });
   }
 
   const body = await req.json();
@@ -44,5 +44,5 @@ export async function PUT(req: NextRequest) {
     { new: true }
   ).select("-password");
 
-  return NextResponse.json({ message: "Profile update ho gaya!", user });
+  return NextResponse.json({ message: "Profile updated successfully!", user });
 }

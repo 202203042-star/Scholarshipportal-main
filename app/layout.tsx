@@ -4,7 +4,7 @@ import { SessionProvider } from "next-auth/react";
 
 export const metadata: Metadata = {
   title: "Scholarship Portal",
-  description: "Scholarship apply karein",
+  description: "Apply for scholarships and find funding opportunities",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

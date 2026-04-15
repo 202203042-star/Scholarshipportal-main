@@ -10,11 +10,11 @@ export async function POST(req: NextRequest) {
     const { username, password } = await req.json();
 
     if (!username || !password) {
-      return NextResponse.json({ error: "Username aur password zaroori hai" }, { status: 400 });
+      return NextResponse.json({ error: "Username and password are required" }, { status: 400 });
     }
 
     if (username !== ADMIN_USERNAME || password !== ADMIN_PASSWORD) {
-      return NextResponse.json({ error: "Galat username ya password" }, { status: 401 });
+      return NextResponse.json({ error: "Invalid username or password" }, { status: 401 });
     }
 
     return NextResponse.json({

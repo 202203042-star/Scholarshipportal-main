@@ -2,6 +2,8 @@ import mongoose, { Schema, Document } from "mongoose";
 
 export interface IScholarship extends Document {
   title: string;
+  titleHi?: string;
+  titleGu?: string;
   description: string;
   amount: number;
   eligibility: string;
@@ -22,6 +24,8 @@ export interface IScholarship extends Document {
 const ScholarshipSchema = new Schema<IScholarship>(
   {
     title: { type: String, required: true },
+    titleHi: { type: String, default: "" },
+    titleGu: { type: String, default: "" },
     description: { type: String, required: true },
     amount: { type: Number, required: true },
     eligibility: { type: String, required: true },
@@ -38,10 +42,7 @@ const ScholarshipSchema = new Schema<IScholarship>(
     documents: { type: String, default: "" },
     applicants: [{ type: Schema.Types.ObjectId, ref: "User" }],
   },
-  { 
-    timestamps: true,
-    strict: true,
-  }
+  { timestamps: true, strict: true }
 );
 
 export default mongoose.models.Scholarship

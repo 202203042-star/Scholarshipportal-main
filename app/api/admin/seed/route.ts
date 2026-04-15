@@ -49,7 +49,7 @@ export async function GET() {
     await Scholarship.deleteMany({});
     const result = await Scholarship.insertMany(DATA);
     return NextResponse.json({
-      message: `✅ ${result.length} scholarships add ho gayi!`,
+      message: `✅ ${result.length} scholarships added successfully!`,
       count: result.length
     });
   } catch (error) {

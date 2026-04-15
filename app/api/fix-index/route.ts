@@ -7,7 +7,7 @@ export async function GET() {
     await connectDB();
     const db = mongoose.connection.db!;
     
-    // Saare indexes delete karo scholarships collection ke
+    // Delete all indexes from scholarships collection
     const indexes = await db.collection("scholarships").indexes();
     console.log("Current indexes:", indexes);
     
@@ -18,12 +18,12 @@ export async function GET() {
       console.log("scholarshipId_1 index not found");
     }
 
-    // Collection bhi drop karo aur fresh start karo
+    // Drop collection and start fresh
     await db.collection("scholarships").drop();
     console.log("Collection dropped!");
     
     return NextResponse.json({ 
-      message: "✅ Collection reset ho gaya! Ab seed chalao." 
+      message: "✅ Collection reset! Now run the seed." 
     });
   } catch (error) {
     console.error(error);

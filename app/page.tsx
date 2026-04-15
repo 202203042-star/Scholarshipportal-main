@@ -49,7 +49,7 @@ const T = {
     steps:["Gather all required documents","Click Apply on Official Site below","Register / Login on portal","Fill personal & academic details","Upload scanned documents","Submit and save your application number"],
     applyOnSite:"Apply on Official Site →",
     watchVideo:"▶ Watch Tutorial",
-    docWallet:"My Document Wallet",
+    docWallet:"My Documents",
     docWalletDesc:"Your documents are saved securely in your browser.",
     docName:"Document Name",
     docFile:"Upload File",
@@ -108,7 +108,7 @@ const T = {
     steps:["सभी दस्तावेज़ एकत्र करें","नीचे 'आधिकारिक साइट' पर क्लिक करें","पोर्टल पर रजिस्टर / लॉगिन करें","व्यक्तिगत और शैक्षणिक विवरण भरें","स्कैन किए दस्तावेज़ अपलोड करें","सबमिट करें और आवेदन नंबर नोट करें"],
     applyOnSite:"आधिकारिक साइट पर आवेदन करें →",
     watchVideo:"▶ ट्यूटोरियल देखें",
-    docWallet:"मेरा दस्तावेज़ वॉलेट",
+    docWallet:"मेरे दस्तावेज़",
     docWalletDesc:"आपके दस्तावेज़ ब्राउज़र में सुरक्षित हैं।",
     docName:"दस्तावेज़ का नाम",
     docFile:"फ़ाइल अपलोड करें",
@@ -167,9 +167,9 @@ const T = {
     steps:["બધા દસ્તાવેજ ભેગા કરો","'સત્તાવાર સાઇટ' ક્લિક કરો","પોર્ટલ પર નોંધણી / લૉગિન","વ્યક્તિગત અને શૈક્ષણિક માહિતી ભરો","સ્કૅન દસ્તાવેજ અપલોડ કરો","સબમિટ કરો અને અરજી નંબર નોંધો"],
     applyOnSite:"સત્તાવાર સાઇટ પર અરજી →",
     watchVideo:"▶ ટ્યુટોરિયલ જુઓ",
-    docWallet:"મારો દસ્તાવેજ વૉલેટ",
-    docWalletDesc:"તમારા દસ્તાવેજ બ્રાઉઝ઼ρ માં સુરક્ષિત છે.",
-    docName:"દસ્તાવેજ નું નામ",
+    docWallet:"મારા દસ્તાવેજો",
+    docWalletDesc:"તમારા દસ્તાવેજ બ્રાઉઝરમાં સુરક્ષિત છે.",
+    docName:"દસ્તાવેજનું નામ",
     docFile:"ફાઇલ અપલોડ",
     addDocument:"દસ્તાવેજ ઉમેરો",
     noDocuments:"હજુ કોઈ દસ્તાવેજ નથી.",
@@ -208,6 +208,8 @@ interface Scholarship {
   id?: number;
   name?: string;
   title?: string;
+  titleHi?: string;
+  titleGu?: string;
   gender: string;
   category: string | string[];
   course: string;
@@ -298,12 +300,12 @@ export default function ScholarshipPage() {
 
   // Fetch scholarships from MongoDB
   useEffect(() => {
-    fetch("/api/scholarships")
-      .then(r => r.json())
-      .then(d => {
-        setScholarships(d.scholarships || []);
-        setScholarshipsLoading(false);
-      })
+   fetch("/api/scholarships")
+  .then(r => r.json())
+  .then(d => {
+    setScholarships(d.scholarships || []);
+    setScholarshipsLoading(false);
+  })
       .catch(() => setScholarshipsLoading(false));
   }, []);
 
@@ -321,7 +323,11 @@ export default function ScholarshipPage() {
   useEffect(() => { try { localStorage.setItem("sh_docs", JSON.stringify(docs)); } catch {} }, [docs]);
   useEffect(() => { try { localStorage.setItem("sh_lang", lang); } catch {} }, [lang]);
 
-  const sName = (s: Scholarship) => s.title || s.name || "";
+  const sName = (s: Scholarship) => {
+  if (lang === "hi" && s.titleHi) return s.titleHi;
+  if (lang === "gu" && s.titleGu) return s.titleGu;
+  return s.title || s.name || "";
+};
   const sAmount = (s: Scholarship) => typeof s.amount === "number" ? `₹${s.amount.toLocaleString("en-IN")}` : s.amount;
   const sLastDate = (s: Scholarship) => s.lastDate || (s.deadline ? new Date(s.deadline).toLocaleDateString("en-IN") : "—");
   const sCategory = (s: Scholarship) => Array.isArray(s.category) ? s.category[0] : s.category;
@@ -361,7 +367,7 @@ export default function ScholarshipPage() {
   const courseLabel = (c: string) => c === "Any" ? t.anyOpt : c === "School" ? t.school : c === "Engineering" ? t.engineering : c === "Medical" ? t.medical : c === "Arts" ? t.arts : c === "Commerce" ? t.commerce : c === "Science" ? t.science : c;
 
   return (
-    <div className="min-h-screen bg-slate-50" style={{ fontFamily: "'Segoe UI',system-ui,sans-serif" }}>
+    <div className="min-h-screen bg-white" style={{ fontFamily: "'Segoe UI',system-ui,sans-serif" }}>
 
       {/* NAVBAR */}
       <header className="sticky top-0 z-40 bg-white border-b border-slate-200" style={{ boxShadow: "0 1px 3px rgba(0,0,0,0.08)" }}>
@@ -656,7 +662,7 @@ export default function ScholarshipPage() {
                             </div>
                           </td>
                           <td className="px-4 py-3.5"><span className={`px-2.5 py-1 rounded-lg text-[10px] font-bold ${lvlBadge(s.level)}`}>{s.level === "Central" ? t.central : s.level === "State" ? t.stateLvl : t.trust}</span></td>
-                          <td className="px-4 py-3.5"><span className={`px-2 py-0.5 rounded text-[10px] font-semibold ${s.course === "School" ? "bg-sky-50 text-sky-700" : "bg-violet-50 text-violet-700"}`}>{s.course === "School" ? t.school : "College"}</span></td>
+                          <td className="px-4 py-3.5"><span className={`px-2 py-0.5 rounded text-[10px] font-semibold ${s.course === "School" ? "bg-sky-50 text-sky-700" : "bg-violet-50 text-violet-700"}`}>{s.course === "School" ? t.school : lang === "hi" ? "कॉलेज" : lang === "gu" ? "કૉલેજ" : "College"}</span></td>
                           <td className="px-4 py-3.5 text-slate-500 text-xs">{s.state}</td>
                           <td className="px-4 py-3.5 text-emerald-700 font-bold text-xs">{sAmount(s)}</td>
                           <td className="px-4 py-3.5">
@@ -699,7 +705,7 @@ export default function ScholarshipPage() {
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3 mb-5">
-            {[["💰 Amount", sAmount(detailS)], [`📅 ${t.lastDate}`, sLastDate(detailS)], ["📚 Course", detailS.course === "School" ? t.school : "College"], ["🗺️ State", detailS.state]].map(([l, v]) => (
+            {[["💰 Amount", sAmount(detailS)], [`📅 ${t.lastDate}`, sLastDate(detailS)], ["📚 Course", detailS.course === "School" ? t.school : lang === "hi" ? "कॉलेज" : lang === "gu" ? "કૉલેજ" : "College"], ["🗺️ State", detailS.state]].map(([l, v]) => (
               <div key={l} className="bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-3">
                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">{l}</p>
                 <p className="text-sm font-bold text-slate-800 mt-0.5">{v}</p>

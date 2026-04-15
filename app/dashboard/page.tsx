@@ -37,10 +37,10 @@ export default async function DashboardPage() {
       <div className="max-w-5xl mx-auto px-6 py-8">
         <div className="mb-8">
           <h2 className="text-2xl font-semibold text-gray-900">
-            Namaste, {session.user?.name?.split(" ")[0]}! 🙏
+            Hello, {session.user?.name?.split(" ")[0]}!
           </h2>
           <p className="text-gray-500 text-sm mt-1">
-            Aapka scholarship dashboard / તમારું ડેશબોર્ડ
+            Your scholarship dashboard
           </p>
         </div>
 
@@ -50,7 +50,7 @@ export default async function DashboardPage() {
             <p className="text-3xl font-semibold text-gray-900 mt-1">{scholarships.length}+</p>
           </div>
           <div className="bg-white border border-gray-200 rounded-xl p-5">
-            <p className="text-sm text-gray-500">Aapka Role</p>
+            <p className="text-sm text-gray-500">Your Role</p>
             <p className="text-xl font-semibold text-blue-600 mt-1 capitalize">
               {(session.user as { role?: string }).role || "student"}
             </p>
@@ -65,7 +65,7 @@ export default async function DashboardPage() {
           <div className="flex items-center justify-between mb-4">
             <h3 className="font-semibold text-gray-900">Latest Scholarships</h3>
             <Link href="/scholarships" className="text-sm text-blue-600 hover:underline">
-              Sab dekho →
+              View all →
             </Link>
           </div>
           <div className="space-y-3">
@@ -88,7 +88,7 @@ export default async function DashboardPage() {
             ))}
             {scholarships.length === 0 && (
               <p className="text-gray-400 text-sm text-center py-4">
-                Abhi koi scholarship available nahi hai
+                No scholarships available now
               </p>
             )}
           </div>

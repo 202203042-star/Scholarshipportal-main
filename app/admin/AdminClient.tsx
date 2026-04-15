@@ -6,6 +6,8 @@ import Link from "next/link";
 interface Scholarship {
   _id: string;
   title: string;
+  titleHi?: string;
+  titleGu?: string;
   amount: number;
   deadline: string;
   isActive: boolean;
@@ -14,7 +16,8 @@ interface Scholarship {
 }
 
 const EMPTY_FORM = {
-  title: "", description: "", amount: "", eligibility: "",
+  title: "", titleHi: "", titleGu: "",
+  description: "", amount: "", eligibility: "",
   deadline: "", applyLink: "", youtubeLink: "", category: "",
   level: "Central", course: "College", state: "Any", gender: "Any",
   income: "999999999", documents: "",
@@ -34,6 +37,7 @@ export default function AdminClient() {
   const [search, setSearch] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+  const [activeTab, setActiveTab] = useState<"active" | "inactive">("active");
 
   const loadScholarships = () => {
     setLoading(true);
@@ -41,37 +45,29 @@ export default function AdminClient() {
     fetch("/api/scholarships")
       .then(r => r.json())
       .then(d => { setScholarships(d.scholarships || []); setLoading(false); })
-      .catch(() => { setError("Scholarships load nahi hui"); setLoading(false); });
+      .catch(() => { setError("Failed to load scholarships"); setLoading(false); });
   };
 
   useEffect(() => { loadScholarships(); }, []);
 
   function toggleCategoryFilter(cat: string) {
     if (cat === "Any") { setSelectedCategories([]); return; }
-    setSelectedCategories(prev =>
-      prev.includes(cat) ? prev.filter(c => c !== cat) : [...prev, cat]
-    );
+    setSelectedCategories(prev => prev.includes(cat) ? prev.filter(c => c !== cat) : [...prev, cat]);
   }
 
- async function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
     setError("");
     const payload = {
-      title: form.title,
-      description: form.description,
-      amount: Number(form.amount),
-      income: Number(form.income),
-      eligibility: form.eligibility,
+      title: form.title, titleHi: form.titleHi, titleGu: form.titleGu,
+      description: form.description, amount: Number(form.amount),
+      income: Number(form.income), eligibility: form.eligibility,
       category: form.category.split(",").map(c => c.trim()).filter(Boolean),
       deadline: new Date(form.deadline).toISOString(),
-      applyLink: form.applyLink,
-      youtubeLink: form.youtubeLink,
-      level: form.level,
-      course: form.course,
-      state: form.state,
-      gender: form.gender,
-      documents: form.documents,
+      applyLink: form.applyLink, youtubeLink: form.youtubeLink,
+      level: form.level, course: form.course, state: form.state,
+      gender: form.gender, documents: form.documents,
     };
     const url = editingId ? `/api/scholarships/${editingId}` : "/api/scholarships";
     try {
@@ -82,33 +78,19 @@ export default function AdminClient() {
       });
       const data = await res.json();
       setSaving(false);
-      if (res.ok) {
-        setForm(EMPTY_FORM);
-        setEditingId(null);
-        setShowForm(false);
-        loadScholarships();
-      } else {
-        setError(data.error || "Save nahi hua. Dobara try karo.");
-      }
-    } catch {
-      setSaving(false);
-      setError("Network error — save nahi hua");
-    }
+      if (res.ok) { setForm(EMPTY_FORM); setEditingId(null); setShowForm(false); loadScholarships(); }
+      else setError(data.error || "Failed to save");
+    } catch { setSaving(false); setError("Network error"); }
   }
 
   async function handleDelete(id: string, title: string) {
-    if (!confirm(`"${title}" permanently delete karna chahte ho?`)) return;
+    if (!confirm(`Do you want to delete "${title}"?`)) return;
     setDeletingId(id);
     try {
       const res = await fetch(`/api/scholarships/${id}`, { method: "DELETE" });
-      if (res.ok) {
-        setScholarships(prev => prev.filter(s => s._id !== id));
-      } else {
-        setError("Delete nahi hua. Dobara try karo.");
-      }
-    } catch {
-      setError("Network error");
-    }
+      if (res.ok) setScholarships(prev => prev.filter(s => s._id !== id));
+      else setError("Failed to delete");
+    } catch { setError("Network error"); }
     setDeletingId(null);
   }
 
@@ -120,59 +102,98 @@ export default function AdminClient() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ isActive: !s.isActive }),
       });
-      if (res.ok) {
-        setScholarships(prev =>
-          prev.map(sc => sc._id === s._id ? { ...sc, isActive: !sc.isActive } : sc)
-        );
-      } else {
-        const data = await res.json();
-        setError(data.error || "Toggle nahi hua");
-      }
-    } catch {
-      setError("Network error");
-    }
+      if (res.ok) setScholarships(prev => prev.map(sc => sc._id === s._id ? { ...sc, isActive: !sc.isActive } : sc));
+      else setError("Failed to toggle status");
+    } catch { setError("Network error"); }
     setTogglingId(null);
   }
 
   function handleEdit(s: any) {
     setForm({
-      title: s.title || "",
-      description: s.description || "",
-      amount: s.amount?.toString() || "",
+      title: s.title || "", titleHi: s.titleHi || "", titleGu: s.titleGu || "",
+      description: s.description || "", amount: s.amount?.toString() || "",
       eligibility: s.eligibility || "",
       deadline: s.deadline ? new Date(s.deadline).toISOString().split("T")[0] : "",
-      applyLink: s.applyLink || "",
-      youtubeLink: s.youtubeLink || "",
+      applyLink: s.applyLink || "", youtubeLink: s.youtubeLink || "",
       category: Array.isArray(s.category) ? s.category.join(", ") : s.category || "",
-      level: s.level || "Central",
-      course: s.course || "College",
-      state: s.state || "Any",
-      gender: s.gender || "Any",
-      income: s.income?.toString() || "999999999",
-      documents: s.documents || "",
+      level: s.level || "Central", course: s.course || "College",
+      state: s.state || "Any", gender: s.gender || "Any",
+      income: s.income?.toString() || "999999999", documents: s.documents || "",
     });
     setEditingId(s._id);
     setShowForm(true);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
-  const filtered = scholarships.filter(s => {
+  const activeScholarships = scholarships.filter(s => s.isActive);
+  const inactiveScholarships = scholarships.filter(s => !s.isActive);
+
+  const filterList = (list: Scholarship[]) => list.filter(s => {
     const matchSearch = s.title.toLowerCase().includes(search.toLowerCase());
-    const matchCat = selectedCategories.length === 0 ||
-      selectedCategories.some(c => s.category?.includes(c));
+    const matchCat = selectedCategories.length === 0 || selectedCategories.some(c => s.category?.includes(c));
     return matchSearch && matchCat;
   });
 
-  const active = scholarships.filter(s => s.isActive).length;
+  const filteredActive = filterList(activeScholarships);
+  const filteredInactive = filterList(inactiveScholarships);
 
   const inputStyle: React.CSSProperties = {
     width: "100%", border: "1.5px solid #e2e8f0", borderRadius: "10px",
     padding: "10px 14px", fontSize: "14px", outline: "none", boxSizing: "border-box",
   };
 
+  const ScholarshipCard = ({ s }: { s: Scholarship }) => (
+    <div style={{
+      border: "1.5px solid #f0f4ff", borderRadius: "12px",
+      padding: "16px 20px", display: "flex",
+      alignItems: "center", justifyContent: "space-between",
+      background: s.isActive ? "#fafbff" : "#fafafa",
+      opacity: s.isActive ? 1 : 0.8
+    }}
+    onMouseEnter={e => (e.currentTarget.style.borderColor = "#667eea")}
+    onMouseLeave={e => (e.currentTarget.style.borderColor = "#f0f4ff")}>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <p style={{ fontWeight: 700, color: "#1a1a2e", margin: "0 0 2px", fontSize: "15px" }}>{s.title}</p>
+        {s.titleHi && <p style={{ fontSize: "12px", color: "#667eea", margin: "0 0 2px" }}>{s.titleHi}</p>}
+        {s.titleGu && <p style={{ fontSize: "12px", color: "#059669", margin: "0 0 4px" }}>{s.titleGu}</p>}
+        <p style={{ fontSize: "12px", color: "#94a3b8", margin: 0 }}>
+          ₹{s.amount.toLocaleString("en-IN")} &nbsp;·&nbsp;
+          {Array.isArray(s.category) ? s.category.join(", ") : s.category} &nbsp;·&nbsp;
+          {s.applicants?.length || 0} applicants &nbsp;·&nbsp;
+          Deadline: {new Date(s.deadline).toLocaleDateString("en-IN")}
+        </p>
+      </div>
+      <div style={{ display: "flex", alignItems: "center", gap: "8px", marginLeft: "16px", flexShrink: 0 }}>
+        <button onClick={() => handleToggleActive(s)} disabled={togglingId === s._id}
+          style={{
+            padding: "5px 14px", borderRadius: "20px", fontSize: "12px", fontWeight: 600,
+            cursor: togglingId === s._id ? "not-allowed" : "pointer", border: "1.5px solid",
+            borderColor: s.isActive ? "#bbf7d0" : "#fecaca",
+            background: s.isActive ? "#f0fdf4" : "#fef2f2",
+            color: s.isActive ? "#16a34a" : "#dc2626",
+            opacity: togglingId === s._id ? 0.5 : 1, transition: "all 0.15s"
+          }}>
+          {togglingId === s._id ? "..." : s.isActive ? "Active" : "Inactive"}
+        </button>
+        <button onClick={() => handleEdit(s)} style={{
+          background: "#eff6ff", color: "#2563eb", border: "none",
+          borderRadius: "8px", padding: "6px 14px", fontSize: "12px", fontWeight: 600, cursor: "pointer"
+        }}>Edit</button>
+        <button onClick={() => handleDelete(s._id, s.title)} disabled={deletingId === s._id}
+          style={{
+            background: "#fef2f2", color: "#dc2626", border: "none",
+            borderRadius: "8px", padding: "6px 14px", fontSize: "12px", fontWeight: 600,
+            cursor: deletingId === s._id ? "not-allowed" : "pointer",
+            opacity: deletingId === s._id ? 0.5 : 1
+          }}>
+          {deletingId === s._id ? "..." : "Delete"}
+        </button>
+      </div>
+    </div>
+  );
+
   return (
     <div style={{ minHeight: "100vh", backgroundColor: "#f8fafc" }}>
-
       {/* Navbar */}
       <nav style={{
         background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
@@ -194,8 +215,7 @@ export default function AdminClient() {
         <div style={{ display: "flex", gap: "12px" }}>
           <button onClick={loadScholarships} style={{
             background: "rgba(255,255,255,0.15)", border: "1px solid rgba(255,255,255,0.3)",
-            color: "white", padding: "8px 16px", borderRadius: "8px",
-            fontSize: "13px", cursor: "pointer"
+            color: "white", padding: "8px 16px", borderRadius: "8px", fontSize: "13px", cursor: "pointer"
           }}>Refresh</button>
           <Link href="/login" style={{
             background: "rgba(255,255,255,0.1)", border: "1px solid rgba(255,255,255,0.3)",
@@ -211,8 +231,8 @@ export default function AdminClient() {
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "20px", marginBottom: "32px" }}>
           {[
             { label: "Total Scholarships", value: scholarships.length, gradient: "linear-gradient(135deg, #667eea, #764ba2)" },
-            { label: "Active", value: active, gradient: "linear-gradient(135deg, #11998e, #38ef7d)" },
-            { label: "Inactive", value: scholarships.length - active, gradient: "linear-gradient(135deg, #f093fb, #f5576c)" },
+            { label: "Active", value: activeScholarships.length, gradient: "linear-gradient(135deg, #11998e, #38ef7d)" },
+            { label: "Inactive", value: inactiveScholarships.length, gradient: "linear-gradient(135deg, #f093fb, #f5576c)" },
           ].map(stat => (
             <div key={stat.label} style={{
               background: "white", borderRadius: "16px", padding: "24px",
@@ -235,14 +255,14 @@ export default function AdminClient() {
           <div style={{
             background: "#fef2f2", border: "1px solid #fecaca", color: "#dc2626",
             borderRadius: "10px", padding: "12px 16px", fontSize: "14px", marginBottom: "20px",
-            display: "flex", justifyContent: "space-between", alignItems: "center"
+            display: "flex", justifyContent: "space-between"
           }}>
             {error}
-            <button onClick={() => setError("")} style={{ background: "none", border: "none", cursor: "pointer", color: "#dc2626", fontSize: "16px" }}>×</button>
+            <button onClick={() => setError("")} style={{ background: "none", border: "none", cursor: "pointer", color: "#dc2626" }}>×</button>
           </div>
         )}
 
-        {/* Form Card */}
+        {/* Form */}
         <div style={{
           background: "white", borderRadius: "16px",
           boxShadow: "0 2px 12px rgba(0,0,0,0.06)",
@@ -257,13 +277,11 @@ export default function AdminClient() {
             <h3 style={{ margin: 0, fontSize: "16px", fontWeight: 700, color: "#1a1a2e" }}>
               {editingId ? "Edit Scholarship" : "Add New Scholarship"}
             </h3>
-            <button
-              onClick={() => { setShowForm(!showForm); if (showForm) { setEditingId(null); setForm(EMPTY_FORM); } }}
+            <button onClick={() => { setShowForm(!showForm); if (showForm) { setEditingId(null); setForm(EMPTY_FORM); } }}
               style={{
                 background: showForm ? "#f1f5f9" : "linear-gradient(135deg, #667eea, #764ba2)",
                 color: showForm ? "#64748b" : "white", border: "none",
-                borderRadius: "8px", padding: "8px 18px",
-                fontSize: "13px", cursor: "pointer", fontWeight: 600
+                borderRadius: "8px", padding: "8px 18px", fontSize: "13px", cursor: "pointer", fontWeight: 600
               }}>
               {showForm ? "Close" : "+ Add Scholarship"}
             </button>
@@ -274,9 +292,21 @@ export default function AdminClient() {
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px" }}>
 
                 <div style={{ gridColumn: "1 / -1" }}>
-                  <label style={{ display: "block", fontSize: "13px", fontWeight: 600, color: "#374151", marginBottom: "6px" }}>Scholarship Title *</label>
+                  <label style={{ display: "block", fontSize: "13px", fontWeight: 600, color: "#374151", marginBottom: "6px" }}>Scholarship Title (English) *</label>
                   <input required value={form.title} onChange={e => setForm({ ...form, title: e.target.value })}
                     placeholder="e.g. PM Scholarship 2025" style={inputStyle} />
+                </div>
+
+                <div>
+                  <label style={{ display: "block", fontSize: "13px", fontWeight: 600, color: "#374151", marginBottom: "6px" }}>Hindi Title (हिंदी नाम)</label>
+                  <input value={form.titleHi} onChange={e => setForm({ ...form, titleHi: e.target.value })}
+                    placeholder="e.g. प्रधानमंत्री छात्रवृत्ति" style={inputStyle} />
+                </div>
+
+                <div>
+                  <label style={{ display: "block", fontSize: "13px", fontWeight: 600, color: "#374151", marginBottom: "6px" }}>Gujarati Title (ગુજરાતી નામ)</label>
+                  <input value={form.titleGu} onChange={e => setForm({ ...form, titleGu: e.target.value })}
+                    placeholder="e.g. પ્રધાનમંત્રી શિષ્યવૃત્તિ" style={inputStyle} />
                 </div>
 
                 <div>
@@ -290,10 +320,9 @@ export default function AdminClient() {
                   <input required type="date" value={form.deadline} onChange={e => setForm({ ...form, deadline: e.target.value })} style={inputStyle} />
                 </div>
 
-                {/* Category chips */}
                 <div style={{ gridColumn: "1 / -1" }}>
                   <label style={{ display: "block", fontSize: "13px", fontWeight: 600, color: "#374151", marginBottom: "8px" }}>
-                    Category * <span style={{ color: "#94a3b8", fontWeight: 400 }}>(multiple select kar sakte ho)</span>
+                    Category * <span style={{ color: "#94a3b8", fontWeight: 400 }}>(multiple select)</span>
                   </label>
                   <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
                     {["General", "OBC", "SC", "ST", "Minority", "EWS", "Girls"].map(cat => {
@@ -306,22 +335,17 @@ export default function AdminClient() {
                             setForm({ ...form, category: updated.join(", ") });
                           }}
                           style={{
-                            padding: "6px 16px", borderRadius: "20px", fontSize: "13px",
-                            fontWeight: 600, cursor: "pointer", border: "1.5px solid",
+                            padding: "6px 16px", borderRadius: "20px", fontSize: "13px", fontWeight: 600,
+                            cursor: "pointer", border: "1.5px solid",
                             borderColor: selected ? "#667eea" : "#e2e8f0",
                             background: selected ? "linear-gradient(135deg, #667eea, #764ba2)" : "white",
-                            color: selected ? "white" : "#64748b", transition: "all 0.15s"
+                            color: selected ? "white" : "#64748b"
                           }}>
                           {selected ? "✓ " : ""}{cat}
                         </button>
                       );
                     })}
                   </div>
-                  {form.category && (
-                    <p style={{ fontSize: "12px", color: "#94a3b8", marginTop: "6px", margin: "6px 0 0" }}>
-                      Selected: {form.category}
-                    </p>
-                  )}
                 </div>
 
                 <div>
@@ -399,12 +423,10 @@ export default function AdminClient() {
                   {saving ? "Saving..." : editingId ? "Update" : "Add Scholarship"}
                 </button>
                 {editingId && (
-                  <button type="button"
-                    onClick={() => { setEditingId(null); setForm(EMPTY_FORM); setShowForm(false); }}
+                  <button type="button" onClick={() => { setEditingId(null); setForm(EMPTY_FORM); setShowForm(false); }}
                     style={{
-                      background: "white", color: "#64748b",
-                      border: "1.5px solid #e2e8f0", borderRadius: "10px",
-                      padding: "12px 24px", fontSize: "14px", fontWeight: 600, cursor: "pointer"
+                      background: "white", color: "#64748b", border: "1.5px solid #e2e8f0",
+                      borderRadius: "10px", padding: "12px 24px", fontSize: "14px", fontWeight: 600, cursor: "pointer"
                     }}>
                     Cancel
                   </button>
@@ -414,38 +436,32 @@ export default function AdminClient() {
           )}
         </div>
 
-        {/* Scholarship List */}
+        {/* Scholarship List with Tabs */}
         <div style={{
           background: "white", borderRadius: "16px",
           boxShadow: "0 2px 12px rgba(0,0,0,0.06)",
           border: "1px solid rgba(0,0,0,0.06)", overflow: "hidden"
         }}>
-          {/* List Header */}
+          {/* Header */}
           <div style={{
             padding: "20px 28px", borderBottom: "1px solid #f0f0f0",
-            display: "flex", alignItems: "center", justifyContent: "space-between",
-            flexWrap: "wrap", gap: "12px"
+            display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "12px"
           }}>
             <h3 style={{ margin: 0, fontSize: "16px", fontWeight: 700, color: "#1a1a2e" }}>
               Total Scholarships
               <span style={{
-                background: "linear-gradient(135deg, #667eea, #764ba2)",
-                color: "white", borderRadius: "20px",
-                padding: "2px 12px", fontSize: "13px", marginLeft: "10px"
-              }}>{filtered.length}</span>
+                background: "linear-gradient(135deg, #667eea, #764ba2)", color: "white",
+                borderRadius: "20px", padding: "2px 12px", fontSize: "13px", marginLeft: "10px"
+              }}>{scholarships.length}</span>
             </h3>
             <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
               <input value={search} onChange={e => setSearch(e.target.value)}
                 placeholder="Search scholarship..."
-                style={{
-                  border: "1.5px solid #e2e8f0", borderRadius: "10px",
-                  padding: "9px 14px", fontSize: "13px", outline: "none", width: "200px"
-                }} />
+                style={{ border: "1.5px solid #e2e8f0", borderRadius: "10px", padding: "9px 14px", fontSize: "13px", outline: "none", width: "200px" }} />
               <button onClick={() => { setShowForm(true); setEditingId(null); setForm(EMPTY_FORM); window.scrollTo({ top: 0, behavior: "smooth" }); }}
                 style={{
-                  background: "linear-gradient(135deg, #667eea, #764ba2)",
-                  color: "white", border: "none", borderRadius: "10px",
-                  padding: "9px 18px", fontSize: "13px", fontWeight: 600,
+                  background: "linear-gradient(135deg, #667eea, #764ba2)", color: "white", border: "none",
+                  borderRadius: "10px", padding: "9px 18px", fontSize: "13px", fontWeight: 600,
                   cursor: "pointer", boxShadow: "0 4px 12px rgba(102,126,234,0.3)"
                 }}>
                 + Add Scholarship
@@ -454,21 +470,18 @@ export default function AdminClient() {
           </div>
 
           {/* Category Filter */}
-          <div style={{
-            padding: "14px 28px", borderBottom: "1px solid #f8f8f8",
-            display: "flex", flexWrap: "wrap", gap: "8px", alignItems: "center"
-          }}>
+          <div style={{ padding: "14px 28px", borderBottom: "1px solid #f8f8f8", display: "flex", flexWrap: "wrap", gap: "8px", alignItems: "center" }}>
             <span style={{ fontSize: "13px", fontWeight: 600, color: "#64748b", marginRight: "4px" }}>Filter:</span>
             {ALL_CATEGORIES.map(cat => {
               const isSelected = cat === "Any" ? selectedCategories.length === 0 : selectedCategories.includes(cat);
               return (
                 <button key={cat} onClick={() => toggleCategoryFilter(cat)}
                   style={{
-                    padding: "5px 14px", borderRadius: "20px", fontSize: "12px",
-                    fontWeight: 600, cursor: "pointer", border: "1.5px solid",
+                    padding: "5px 14px", borderRadius: "20px", fontSize: "12px", fontWeight: 600,
+                    cursor: "pointer", border: "1.5px solid",
                     borderColor: isSelected ? "#667eea" : "#e2e8f0",
                     background: isSelected ? "linear-gradient(135deg, #667eea, #764ba2)" : "white",
-                    color: isSelected ? "white" : "#64748b", transition: "all 0.15s"
+                    color: isSelected ? "white" : "#64748b"
                   }}>
                   {cat}
                 </button>
@@ -476,81 +489,43 @@ export default function AdminClient() {
             })}
           </div>
 
-          {/* List Body */}
+          {/* Tabs — Active / Inactive */}
+          <div style={{ display: "flex", borderBottom: "1px solid #f0f0f0" }}>
+            {[
+              { key: "active", label: `Active (${filteredActive.length})`, color: "#16a34a" },
+              { key: "inactive", label: `Inactive / Expired (${filteredInactive.length})`, color: "#dc2626" },
+            ].map(tab => (
+              <button key={tab.key} onClick={() => setActiveTab(tab.key as any)}
+                style={{
+                  flex: 1, padding: "14px", border: "none", cursor: "pointer", fontSize: "14px", fontWeight: 700,
+                  background: activeTab === tab.key ? "white" : "#fafafa",
+                  color: activeTab === tab.key ? tab.color : "#94a3b8",
+                  borderBottom: activeTab === tab.key ? `2px solid ${tab.color}` : "2px solid transparent",
+                  transition: "all 0.2s"
+                }}>
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {/* List */}
           <div style={{ padding: "16px 28px" }}>
             {loading ? (
-              <div style={{ textAlign: "center", padding: "48px", color: "#94a3b8" }}>
-                <p style={{ margin: 0 }}>Loading...</p>
-              </div>
-            ) : filtered.length === 0 ? (
-              <div style={{ textAlign: "center", padding: "48px" }}>
-                <div style={{ fontSize: "48px", marginBottom: "12px" }}>🎓</div>
-                <p style={{ color: "#64748b", margin: "0 0 16px" }}>Koi scholarship nahi mili</p>
-              </div>
+              <div style={{ textAlign: "center", padding: "48px", color: "#94a3b8" }}>Loading...</div>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-                {filtered.map(s => (
-                  <div key={s._id} style={{
-                    border: "1.5px solid #f0f4ff", borderRadius: "12px",
-                    padding: "16px 20px", display: "flex",
-                    alignItems: "center", justifyContent: "space-between",
-                    background: s.isActive ? "#fafbff" : "#fafafa"
-                  }}
-                  onMouseEnter={e => (e.currentTarget.style.borderColor = "#667eea")}
-                  onMouseLeave={e => (e.currentTarget.style.borderColor = "#f0f4ff")}>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <p style={{ fontWeight: 700, color: "#1a1a2e", margin: "0 0 4px", fontSize: "15px" }}>
-                        {s.title}
-                      </p>
-                      <p style={{ fontSize: "12px", color: "#94a3b8", margin: 0 }}>
-                        ₹{s.amount.toLocaleString("en-IN")} &nbsp;·&nbsp;
-                        {Array.isArray(s.category) ? s.category.join(", ") : s.category} &nbsp;·&nbsp;
-                        {s.applicants?.length || 0} applicants &nbsp;·&nbsp;
-                        {new Date(s.deadline).toLocaleDateString("en-IN")}
-                      </p>
-                    </div>
-                    <div style={{ display: "flex", alignItems: "center", gap: "8px", marginLeft: "16px", flexShrink: 0 }}>
-
-                      {/* Active/Inactive Toggle */}
-                      <button
-                        onClick={() => handleToggleActive(s)}
-                        disabled={togglingId === s._id}
-                        title={s.isActive ? "Inactive karo" : "Active karo"}
-                        style={{
-                          padding: "5px 14px", borderRadius: "20px", fontSize: "12px", fontWeight: 600,
-                          cursor: togglingId === s._id ? "not-allowed" : "pointer",
-                          border: "1.5px solid",
-                          borderColor: s.isActive ? "#bbf7d0" : "#fecaca",
-                          background: s.isActive ? "#f0fdf4" : "#fef2f2",
-                          color: s.isActive ? "#16a34a" : "#dc2626",
-                          opacity: togglingId === s._id ? 0.5 : 1,
-                          transition: "all 0.15s"
-                        }}>
-                        {togglingId === s._id ? "..." : s.isActive ? "Active" : "Inactive"}
-                      </button>
-
-                      <button onClick={() => handleEdit(s)} style={{
-                        background: "#eff6ff", color: "#2563eb", border: "none",
-                        borderRadius: "8px", padding: "6px 14px",
-                        fontSize: "12px", fontWeight: 600, cursor: "pointer"
-                      }}>
-                        Edit
-                      </button>
-
-                      <button onClick={() => handleDelete(s._id, s.title)}
-                        disabled={deletingId === s._id}
-                        style={{
-                          background: "#fef2f2", color: "#dc2626", border: "none",
-                          borderRadius: "8px", padding: "6px 14px",
-                          fontSize: "12px", fontWeight: 600,
-                          cursor: deletingId === s._id ? "not-allowed" : "pointer",
-                          opacity: deletingId === s._id ? 0.5 : 1
-                        }}>
-                        {deletingId === s._id ? "..." : "Delete"}
-                      </button>
-                    </div>
+                {(activeTab === "active" ? filteredActive : filteredInactive).length === 0 ? (
+                  <div style={{ textAlign: "center", padding: "48px" }}>
+                    <div style={{ fontSize: "48px", marginBottom: "12px" }}>🎓</div>
+                    <p style={{ color: "#64748b", margin: 0 }}>
+                      {activeTab === "active" ? "No active scholarships" : "No inactive scholarships"}
+                    </p>
                   </div>
-                ))}
+                ) : (
+                  (activeTab === "active" ? filteredActive : filteredInactive).map(s => (
+                    <ScholarshipCard key={s._id} s={s} />
+                  ))
+                )}
               </div>
             )}
           </div>

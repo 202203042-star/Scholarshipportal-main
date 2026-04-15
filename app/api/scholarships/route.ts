@@ -3,12 +3,22 @@ import connectDB from "@/lib/mongodb";
 import Scholarship from "@/models/Scholarship";
 import { auth } from "@/lib/auth";
 
+// Auto-inactive expired scholarships
+async function autoDeactivateExpired() {
+  const now = new Date();
+  await Scholarship.updateMany(
+    { deadline: { $lt: now }, isActive: true },
+    { $set: { isActive: false } }
+  );
+}
+
 export async function GET() {
   try {
     await connectDB();
+    await autoDeactivateExpired();
     const scholarships = await Scholarship.find({}).sort({ createdAt: -1 });
-    return NextResponse.json({ scholarships });  // ← ye fix hai
-  } catch (error) {
+    return NextResponse.json({ scholarships });
+  } catch {
     return NextResponse.json({ scholarships: [], error: "DB error" }, { status: 500 });
   }
 }
@@ -22,8 +32,8 @@ export async function POST(req: NextRequest) {
     await connectDB();
     const body = await req.json();
     const scholarship = await Scholarship.create(body);
-    return NextResponse.json({ scholarship, message: "Scholarship add ho gayi!" }, { status: 201 });
-  } catch (error) {
-    return NextResponse.json({ error: "Kuch galat hua" }, { status: 500 });
+    return NextResponse.json({ scholarship, message: "Scholarship added successfully!" }, { status: 201 });
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message || "DB error" }, { status: 500 });
   }
 }

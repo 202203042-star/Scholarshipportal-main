@@ -9,7 +9,7 @@ export async function POST(req: NextRequest) {
 
     if (!name || !email || !password) {
       return NextResponse.json(
-        { error: "Naam, email aur password zaroori hai" },
+        { error: "Name, email, and password are required" },
         { status: 400 }
       );
     }
@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
     const existing = await User.findOne({ email });
     if (existing) {
       return NextResponse.json(
-        { error: "Yeh email pehle se registered hai" },
+        { error: "This email is already registered" },
         { status: 400 }
       );
     }
@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json(
       {
-        message: "Account successfully ban gaya!",
+        message: "Account created successfully!",
         user: { id: user._id, name: user.name, email: user.email },
       },
       { status: 201 }

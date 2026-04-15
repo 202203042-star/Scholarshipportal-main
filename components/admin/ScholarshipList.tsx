@@ -19,7 +19,7 @@ export default function ScholarshipList({ scholarships }: { scholarships: Schola
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const handleDelete = async (id: string, title: string) => {
-    if (!confirm(`"${title}" delete karna chahte ho?`)) return;
+    if (!confirm(`Do you want to delete "${title}"?`)) return;
     setDeletingId(id);
     await fetch(`/api/scholarships/${id}`, { method: "DELETE" });
     setDeletingId(null);
@@ -38,7 +38,7 @@ export default function ScholarshipList({ scholarships }: { scholarships: Schola
         <tbody className="divide-y">
           {scholarships.length === 0 && (
             <tr><td colSpan={7} className="px-4 py-10 text-center text-gray-400">
-              Koi scholarship nahi. Nayi add karo!
+              No scholarships. Add a new one!
             </td></tr>
           )}
           {scholarships.map(s => (

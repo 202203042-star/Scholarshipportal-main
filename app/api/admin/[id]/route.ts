@@ -18,8 +18,8 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     await connectDB();
     const body = await req.json();
     const scholarship = await Scholarship.findByIdAndUpdate(params.id, body, { new: true });
-    if (!scholarship) return NextResponse.json({ error: "Scholarship nahi mili" }, { status: 404 });
-    return NextResponse.json({ message: "Scholarship update ho gayi!", scholarship });
+    if (!scholarship) return NextResponse.json({ error: "Scholarship not found" }, { status: 404 });
+    return NextResponse.json({ message: "Scholarship updated successfully!", scholarship });
   } catch {
     return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
@@ -33,8 +33,8 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
   try {
     await connectDB();
     const scholarship = await Scholarship.findByIdAndDelete(params.id);
-    if (!scholarship) return NextResponse.json({ error: "Scholarship nahi mili" }, { status: 404 });
-    return NextResponse.json({ message: "Scholarship delete ho gayi!" });
+    if (!scholarship) return NextResponse.json({ error: "Scholarship not found" }, { status: 404 });
+    return NextResponse.json({ message: "Scholarship deleted successfully!" });
   } catch {
     return NextResponse.json({ error: "Server error" }, { status: 500 });
   }

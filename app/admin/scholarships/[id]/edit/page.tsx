@@ -29,7 +29,7 @@ export default async function EditScholarshipPage({ params }: { params: { id: st
 
   return (
     <div className="p-6 max-w-4xl mx-auto">
-      <h1 className="text-2xl font-bold mb-6">Scholarship Edit Karo</h1>
+      <h1 className="text-2xl font-bold mb-6">Edit Scholarship</h1>
       <ScholarshipForm initialData={data} isEdit />
     </div>
   );

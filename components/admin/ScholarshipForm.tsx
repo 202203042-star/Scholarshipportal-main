@@ -83,7 +83,7 @@ export default function ScholarshipForm({ initialData, isEdit = false }: Props) 
 
     setLoading(false);
     if (res.ok) { router.push("/admin/scholarships"); router.refresh(); }
-    else alert("Kuch galat hua. Dobara try karo.");
+    else alert("Something went wrong. Try again.");
   };
 
   return (
@@ -109,7 +109,7 @@ export default function ScholarshipForm({ initialData, isEdit = false }: Props) 
         </div>
 
         <div>
-          <label className="block text-sm font-medium mb-1">Category * <span className="text-gray-400 text-xs">(comma se alag karo)</span></label>
+          <label className="block text-sm font-medium mb-1">Category * <span className="text-gray-400 text-xs">(separate with comma)</span></label>
           <input name="category" value={form.category} onChange={handleChange}
             placeholder="SC/ST, OBC, Girls" required
             className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
@@ -188,7 +188,7 @@ export default function ScholarshipForm({ initialData, isEdit = false }: Props) 
         <div className="flex items-center gap-2">
           <input type="checkbox" name="isActive" id="isActive"
             checked={form.isActive} onChange={handleChange} className="w-4 h-4" />
-          <label htmlFor="isActive" className="text-sm font-medium">Active (users ko dikhega)</label>
+          <label htmlFor="isActive" className="text-sm font-medium">Active (visible to users)</label>
         </div>
 
       </div>
@@ -196,7 +196,7 @@ export default function ScholarshipForm({ initialData, isEdit = false }: Props) 
       <div className="flex gap-3 pt-2">
         <button type="submit" disabled={loading}
           className="bg-blue-600 text-white px-6 py-2 rounded-md text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
-          {loading ? "Saving..." : isEdit ? "Update Karo" : "Add Karo"}
+          {loading ? "Saving..." : isEdit ? "Update" : "Add"}
         </button>
         <button type="button" onClick={() => router.back()}
           className="border px-6 py-2 rounded-md text-sm font-medium hover:bg-gray-50">

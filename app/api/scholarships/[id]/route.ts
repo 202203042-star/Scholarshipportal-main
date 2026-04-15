@@ -36,7 +36,7 @@ export async function PUT(
       { new: true, runValidators: false }
     );
     if (!updated) return NextResponse.json({ error: "Not found" }, { status: 404 });
-    return NextResponse.json({ scholarship: updated, message: "Update ho gaya!" });
+    return NextResponse.json({ scholarship: updated, message: "Updated!" });
   } catch (err: any) {
     return NextResponse.json({ error: err.message || "DB error" }, { status: 500 });
   }
@@ -55,7 +55,7 @@ export async function DELETE(
     await connectDB();
     const deleted = await Scholarship.findByIdAndDelete(id);
     if (!deleted) return NextResponse.json({ error: "Not found" }, { status: 404 });
-    return NextResponse.json({ message: "Delete ho gaya!" });
+    return NextResponse.json({ message: "Deleted!" });
   } catch {
     return NextResponse.json({ error: "DB error" }, { status: 500 });
   }

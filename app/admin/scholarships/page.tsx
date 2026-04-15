@@ -20,12 +20,12 @@ export default async function AdminScholarshipsPage() {
     <div className="p-6 max-w-7xl mx-auto">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold">Scholarships Manage Karo</h1>
+          <h1 className="text-2xl font-bold">Manage Scholarships</h1>
           <p className="text-gray-500 text-sm mt-1">Total: {scholarships.length} scholarships</p>
         </div>
         <Link href="/admin/scholarships/new"
           className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700">
-          + Nayi Scholarship
+          + New Scholarship
         </Link>
       </div>
       <ScholarshipList scholarships={scholarships} />
