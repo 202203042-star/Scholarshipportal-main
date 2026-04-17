@@ -16,7 +16,10 @@ export async function GET() {
   try {
     await connectDB();
     await autoDeactivateExpired();
-    const scholarships = await Scholarship.find({}).sort({ createdAt: -1 });
+    // titleHi aur titleGu explicitly select karo
+    const scholarships = await Scholarship.find({})
+      .select("title titleHi titleGu description amount eligibility category deadline applyLink youtubeLink isActive level course state gender income documents applicants createdAt")
+      .sort({ createdAt: -1 });
     return NextResponse.json({ scholarships });
   } catch {
     return NextResponse.json({ scholarships: [], error: "DB error" }, { status: 500 });

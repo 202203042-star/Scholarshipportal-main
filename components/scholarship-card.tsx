@@ -14,8 +14,15 @@ const categoryColors: Record<string, string> = {
   Commerce: "bg-chart-3/15 text-chart-3",
 }
 
+// ✅ FIX: Language ke hisaab se sahi title return karta hai
+function getLocalizedTitle(scholarship: Scholarship, lang: string): string {
+  if (lang === "hi" && (scholarship as any).titleHi) return (scholarship as any).titleHi
+  if (lang === "gu" && (scholarship as any).titleGu) return (scholarship as any).titleGu
+  return scholarship.title
+}
+
 export function ScholarshipCard({ scholarship }: { scholarship: Scholarship }) {
-  const { t } = useLanguage()
+  const { t, lang } = useLanguage()  // ✅ lang bhi lo
 
   const colorClass = categoryColors[scholarship.category] || categoryColors.General
 
@@ -29,8 +36,9 @@ export function ScholarshipCard({ scholarship }: { scholarship: Scholarship }) {
           <span className="text-xs text-muted-foreground">{scholarship.provider}</span>
         </div>
 
+        {/* ✅ FIX: lang pass karke localized title dikhao */}
         <h3 className="mb-2 text-balance text-lg font-bold text-foreground group-hover:text-primary transition-colors">
-          {scholarship.title}
+          {getLocalizedTitle(scholarship, lang)}
         </h3>
 
         <p className="mb-4 line-clamp-2 text-sm leading-relaxed text-muted-foreground">

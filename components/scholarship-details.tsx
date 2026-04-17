@@ -16,8 +16,25 @@ import {
   CheckCircle,
 } from "lucide-react"
 
+// ✅ FIX: Scholarship ke saare language fields ke liye helper
+function getLocalized(
+  scholarship: any,
+  field: string,
+  lang: string
+): string {
+  if (lang === "hi") {
+    const hiVal = scholarship[`${field}Hi`]
+    if (hiVal) return hiVal
+  }
+  if (lang === "gu") {
+    const guVal = scholarship[`${field}Gu`]
+    if (guVal) return guVal
+  }
+  return scholarship[field] || ""
+}
+
 export function ScholarshipDetails({ id }: { id: string }) {
-  const { t, isLoaded } = useLanguage()
+  const { t, lang, isLoaded } = useLanguage()  // ✅ lang lo
   const { getScholarship, hasApplied, applyForScholarship, isLoaded: dataLoaded } = useScholarshipStore()
   const [justApplied, setJustApplied] = useState(false)
 
@@ -51,17 +68,19 @@ export function ScholarshipDetails({ id }: { id: string }) {
     )
   }
 
+  // ✅ FIX: Har field ke liye localized value nikalo
+  const localizedTitle       = getLocalized(scholarship, "title",       lang)
+  const localizedDescription = getLocalized(scholarship, "description", lang)
+  const localizedEligibility = getLocalized(scholarship, "eligibility", lang)
+
   function handleApply() {
     if (!scholarship) return
     const success = applyForScholarship(scholarship.id, scholarship.title)
-    if (success) {
-      setJustApplied(true)
-    }
+    if (success) setJustApplied(true)
   }
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
-      
 
       <main className="flex-1">
         <div className="mx-auto max-w-4xl px-4 py-8 lg:px-8">
@@ -96,8 +115,9 @@ export function ScholarshipDetails({ id }: { id: string }) {
                   {scholarship.provider}
                 </span>
               </div>
+              {/* ✅ FIX: Localized title */}
               <h1 className="text-balance text-2xl font-bold text-foreground md:text-3xl">
-                {scholarship.title}
+                {localizedTitle}
               </h1>
             </div>
 
@@ -128,7 +148,8 @@ export function ScholarshipDetails({ id }: { id: string }) {
                     <Tag className="h-4 w-4 text-muted-foreground" />
                     {t("description")}
                   </h3>
-                  <p className="leading-relaxed text-muted-foreground">{scholarship.description}</p>
+                  {/* ✅ FIX: Localized description */}
+                  <p className="leading-relaxed text-muted-foreground">{localizedDescription}</p>
                 </div>
                 <div>
                   <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold text-foreground">
@@ -142,7 +163,8 @@ export function ScholarshipDetails({ id }: { id: string }) {
                     <Award className="h-4 w-4 text-muted-foreground" />
                     {t("eligibilityCriteria")}
                   </h3>
-                  <p className="text-muted-foreground">{scholarship.eligibility}</p>
+                  {/* ✅ FIX: Localized eligibility */}
+                  <p className="text-muted-foreground">{localizedEligibility}</p>
                 </div>
               </div>
 
