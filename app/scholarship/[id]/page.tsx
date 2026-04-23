@@ -39,7 +39,7 @@ export default function ScholarshipsPage() {
       });
   }, []);
 
-  // ✅ Language ke hisaab se sahi field return karo
+  // ✅ Return the correct field based on language
   function getLocalized(s: Scholarship, field: "title" | "description" | "eligibility"): string {
     if (lang === "hi") {
       const hi = s[`${field}Hi` as keyof Scholarship] as string | undefined;
@@ -106,7 +106,7 @@ export default function ScholarshipsPage() {
             {scholarships.map((s) => (
               <div key={s._id} className="bg-white border border-gray-200 rounded-xl p-5">
                 <div className="flex items-start justify-between mb-3">
-                  {/* ✅ Language switch hone par title turant update hoga */}
+                  {/* ✅ Title updates immediately when the language changes */}
                   <h3 className="font-semibold text-gray-900 text-base leading-tight">
                     {getLocalized(s, "title")}
                   </h3>
