@@ -163,7 +163,7 @@ export async function POST(req: NextRequest) {
       scholarshipId: body.scholarshipId || null,
     });
 
-    // Background mein emails bhejo
+    // Background: send emails to all users
     sendScholarshipNotification(
       body.title,
       body.message,
@@ -173,7 +173,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       notification,
-      message: "Notification bhej di gayi!"
+      message: "Notification sent!"
     }, { status: 201 });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });

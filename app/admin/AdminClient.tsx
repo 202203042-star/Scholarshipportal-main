@@ -15,6 +15,7 @@ interface AbroadScholarship {
 interface Notification {
   _id: string; title: string; message: string; type: "info" | "warning" | "success";
   isActive: boolean; createdAt: string; scholarshipId?: string;
+  targetCategory?: string; personalEmail?: string;
 }
 
 const EMPTY_FORM = {
@@ -27,7 +28,8 @@ const EMPTY_ABROAD: Omit<AbroadScholarship, "_id"> = {
   eligibility: "", level: "Master", fields: "", bond: "No bond",
   applyLink: "", documents: "", tips: "", isActive: true,
 };
-const EMPTY_NOTIF = { title: "", message: "", type: "info" as const, scholarshipId: "" };
+const EMPTY_NOTIF = { title: "", message: "", type: "info" as const, scholarshipId: "", targetCategory: "all", personalEmail: "" };
+const NOTIF_CATEGORIES = ["General", "OBC", "SC", "ST", "Minority", "EWS", "Girls"];
 const ALL_CATEGORIES = ["Any", "General", "OBC", "SC", "ST", "Minority", "EWS", "Girls"];
 const COUNTRIES = [{ id: "usa", name: "🇺🇸 USA" }, { id: "uk", name: "🇬🇧 UK" }, { id: "canada", name: "🇨🇦 Canada" }, { id: "australia", name: "🇦🇺 Australia" }, { id: "germany", name: "🇩🇪 Germany" }];
 const LEVELS = ["Bachelor", "Master", "PhD", "Master / PhD", "PhD / Research", "Any", "Bachelor / Master"];
@@ -191,13 +193,13 @@ export default function AdminClient() {
   }
 
   function handleNotifEdit(n: Notification) {
-    setNotifForm({ title: n.title, message: n.message, type: n.type, scholarshipId: n.scholarshipId || "" });
+    setNotifForm({ title: n.title, message: n.message, type: n.type, scholarshipId: n.scholarshipId || "", targetCategory: n.targetCategory || "all", personalEmail: n.personalEmail || "" });
     setNotifEditingId(n._id); setShowNotifForm(true); window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
   async function handleSendEmail(n: Notification) {
     setSendingMail(true); setMailResult(null);
-    try { const res = await fetch("/api/notifications/send-email", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ notificationId: n._id, scholarshipId: n.scholarshipId }) }); const data = await res.json(); setMailResult({ success: res.ok, message: data.message || (res.ok ? "Email sent!" : "Failed") }); } catch { setMailResult({ success: false, message: "Network error" }); }
+    try { const res = await fetch("/api/notifications/send-email", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ notificationId: n._id, scholarshipId: n.scholarshipId, targetCategory: n.targetCategory, personalEmail: n.personalEmail }) }); const data = await res.json(); setMailResult({ success: res.ok, message: data.message || (res.ok ? "Email sent!" : "Failed") }); } catch { setMailResult({ success: false, message: "Network error" }); }
     setSendingMail(false); setTimeout(() => setMailResult(null), 5000);
   }
 
@@ -735,6 +737,82 @@ export default function AdminClient() {
                           )}
                         </div>
                       </div>
+
+                      {/* ── Category / Personal Target ── */}
+                      <div className="md:col-span-2">
+                        <label className={lbl}>Send To <span className="text-slate-400 font-normal normal-case">(category filter or personal)</span></label>
+                        <div className="flex flex-wrap gap-2 mt-1">
+                          {/* Personal button */}
+                          <button
+                            type="button"
+                            onClick={() => setNotifForm({ ...notifForm, targetCategory: "personal", personalEmail: notifForm.targetCategory === "personal" ? notifForm.personalEmail : "" })}
+                            className={`px-4 py-2 rounded-full text-sm font-bold border transition-all ${notifForm.targetCategory === "personal" ? "text-white border-transparent shadow-sm" : "text-slate-600 border-slate-200 bg-white hover:border-yellow-300"}`}
+                            style={notifForm.targetCategory === "personal" ? { background: "linear-gradient(135deg,#1d4ed8,#4f46e5)" } : {}}>
+                            ✉️ Personal
+                          </button>
+                          {/* All button */}
+                          <button
+                            type="button"
+                            onClick={() => setNotifForm({ ...notifForm, targetCategory: "all", personalEmail: "" })}
+                            className={`px-4 py-2 rounded-full text-sm font-bold border transition-all ${notifForm.targetCategory === "all" ? "text-white border-transparent shadow-sm" : "text-slate-600 border-slate-200 bg-white hover:border-yellow-300"}`}
+                            style={notifForm.targetCategory === "all" ? { background: "linear-gradient(135deg,#f59e0b,#d97706)" } : {}}>
+                            📢 All
+                          </button>
+                          {/* Category buttons */}
+                          {NOTIF_CATEGORIES.map(cat => (
+                            <button
+                              key={cat}
+                              type="button"
+                              onClick={() => setNotifForm({ ...notifForm, targetCategory: cat, personalEmail: "" })}
+                              className={`px-4 py-2 rounded-full text-sm font-bold border transition-all ${notifForm.targetCategory === cat ? "text-white border-transparent shadow-sm" : "text-slate-600 border-slate-200 bg-white hover:border-yellow-300"}`}
+                              style={notifForm.targetCategory === cat ? { background: "linear-gradient(135deg,#f59e0b,#d97706)" } : {}}>
+                              {cat}
+                            </button>
+                          ))}
+                        </div>
+
+                        {/* Personal Email Input */}
+                        {notifForm.targetCategory === "personal" && (
+                          <div className="mt-3">
+                            <label className="block text-xs font-bold text-indigo-600 uppercase tracking-wider mb-1.5">Personal Email ID</label>
+                            <div className="relative">
+                              <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm">✉️</span>
+                              <input
+                                type="email"
+                                required={notifForm.targetCategory === "personal"}
+                                value={notifForm.personalEmail}
+                                onChange={e => setNotifForm({ ...notifForm, personalEmail: e.target.value })}
+                                placeholder="student@example.com"
+                                className={inp + " pl-9"}
+                                style={{ borderColor: "#6366f1", boxShadow: "0 0 0 3px rgba(99,102,241,0.1)" }}
+                              />
+                            </div>
+                            {notifForm.personalEmail && (
+                              <div className="mt-2 bg-indigo-50 border border-indigo-200 rounded-xl px-4 py-2.5 flex items-center gap-2.5">
+                                <span className="text-indigo-500">✉️</span>
+                                <div>
+                                  <p className="text-xs font-bold text-indigo-700">Personal email</p>
+                                  <p className="text-sm font-semibold text-indigo-900">{notifForm.personalEmail}</p>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Category preview */}
+                        {notifForm.targetCategory !== "personal" && notifForm.targetCategory !== "all" && (
+                          <div className="mt-2 bg-amber-50 border border-amber-200 rounded-xl px-4 py-2.5 flex items-center gap-2.5">
+                            <span>🏷️</span>
+                            <p className="text-sm text-amber-800 font-semibold">Only <strong>{notifForm.targetCategory}</strong> category students will receive this email</p>
+                          </div>
+                        )}
+                        {notifForm.targetCategory === "all" && (
+                          <div className="mt-2 bg-slate-50 border border-dashed border-slate-300 rounded-xl px-4 py-2.5 flex items-center gap-2.5">
+                            <span>📢</span>
+                            <p className="text-sm text-slate-500">All registered students will receive this email</p>
+                          </div>
+                        )}
+                      </div>
                       <div className="md:col-span-2">
                         <label className={lbl}>Title *</label>
                         <input required value={notifForm.title} onChange={e => setNotifForm({ ...notifForm, title: e.target.value })} placeholder="e.g. New Scholarship Available!" className={inp} />
@@ -797,9 +875,14 @@ export default function AdminClient() {
                                   <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full border" style={{ background: cfg.bg, color: cfg.color, borderColor: cfg.border }}>{cfg.emoji} {cfg.label}</span>
                                   {linked ? (
                                     <span className="text-[11px] font-semibold bg-yellow-50 text-yellow-800 border border-yellow-200 px-2.5 py-0.5 rounded-full">🎓 {linked.title}</span>
-                                  ) : (
-                                    <span className="text-[11px] font-semibold bg-slate-100 text-slate-500 border border-slate-200 px-2.5 py-0.5 rounded-full">All Students</span>
-                                  )}
+                                  ) : null}
+                                  {n.personalEmail ? (
+                                    <span className="text-[11px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200 px-2.5 py-0.5 rounded-full">✉️ {n.personalEmail}</span>
+                                  ) : n.targetCategory && n.targetCategory !== "all" ? (
+                                    <span className="text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200 px-2.5 py-0.5 rounded-full">🏷️ {n.targetCategory}</span>
+                                  ) : !linked ? (
+                                    <span className="text-[11px] font-semibold bg-slate-100 text-slate-500 border border-slate-200 px-2.5 py-0.5 rounded-full">📢 All Students</span>
+                                  ) : null}
                                   <span className="text-[11px] text-slate-400">{new Date(n.createdAt).toLocaleDateString("en-IN")}</span>
                                 </div>
                                 <p className="font-bold text-slate-900 text-sm mb-1">{n.title}</p>

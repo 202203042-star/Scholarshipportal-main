@@ -17,7 +17,7 @@ export async function PUT(
     const body = await req.json();
     const updated = await Notification.findByIdAndUpdate(id, { $set: body }, { new: true });
     if (!updated) return NextResponse.json({ error: "Not found" }, { status: 404 });
-    return NextResponse.json({ notification: updated, message: "Update ho gaya!" });
+    return NextResponse.json({ notification: updated, message: "Updated successfully!" });
   } catch {
     return NextResponse.json({ error: "DB error" }, { status: 500 });
   }
@@ -35,7 +35,7 @@ export async function DELETE(
     }
     await connectDB();
     await Notification.findByIdAndDelete(id);
-    return NextResponse.json({ message: "Delete ho gaya!" });
+    return NextResponse.json({ message: "Deleted successfully!" });
   } catch {
     return NextResponse.json({ error: "DB error" }, { status: 500 });
   }

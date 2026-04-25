@@ -122,7 +122,7 @@ function buildEmailHTML(params: {
       <!-- Footer note -->
       <p style="margin:20px 0 0;font-size:12px;color:#94a3b8;text-align:center;line-height:1.6;">
         This email was sent by ScholarHub Admin.<br>
-        If you have any questions, <a href="mailto:${process.env.EMAIL_USER}" style="color:#667eea;text-decoration:none;">contact us</a>.
+        Any questions? <a href="mailto:${process.env.EMAIL_USER}" style="color:#667eea;text-decoration:none;">contact us</a>.
       </p>
     </div>
 
@@ -146,7 +146,7 @@ export async function POST(req: NextRequest) {
 
     await connectDB();
 
-    const { notificationId, scholarshipId } = await req.json();
+    const { notificationId, scholarshipId, targetCategory, personalEmail } = await req.json();
 
     if (!notificationId) {
       return NextResponse.json({ error: "notificationId required" }, { status: 400 });
@@ -164,62 +164,69 @@ export async function POST(req: NextRequest) {
       scholarship = await Scholarship.findById(scholarshipId);
     }
 
-    // ── 3. Decide target users ──
+    // ── 3. Target users decide karo ──
     let targetUsers: { email: string; name?: string }[] = [];
 
-    if (scholarship) {
-      // Case A: Specific scholarship → applicants + category-match users
-      const applicantEmails: string[] = scholarship.applicants || [];
+    if (personalEmail) {
+      // Case A: Personal — only a specific email
+      targetUsers = [{ email: personalEmail, name: personalEmail.split("@")[0] }];
 
-      // Applicant users
+    } else if (targetCategory && targetCategory !== "all") {
+      // Case B: Category-wise — only students of that category
+      targetUsers = await User.find(
+        {
+          $or: [
+            { casteCategory: { $regex: new RegExp("^" + targetCategory + "$", "i") } },
+            { category: { $regex: new RegExp("^" + targetCategory + "$", "i") } },
+          ],
+        },
+        { email: 1, name: 1, _id: 0 }
+      );
+      // If none found, send to all
+      if (targetUsers.length === 0) {
+        targetUsers = await User.find({}, { email: 1, name: 1, _id: 0 });
+      }
+
+    } else if (scholarship) {
+      // Case C: Specific scholarship → applicants + category-match users
+      const applicantEmails: string[] = scholarship.applicants || [];
       const applicantUsers = await User.find(
         { email: { $in: applicantEmails } },
         { email: 1, name: 1, _id: 0 }
       );
-
-      // Category-match users (who are eligible for this scholarship)
       const scholarshipCategories: string[] = scholarship.category || [];
       let categoryUsers: any[] = [];
-
       if (scholarshipCategories.length > 0 && !scholarshipCategories.includes("Any")) {
         categoryUsers = await User.find(
           {
-            email: { $nin: applicantEmails }, // Do not duplicate applicants
+            email: { $nin: applicantEmails },
             $or: [
               { casteCategory: { $in: scholarshipCategories.map((c: string) => c.toLowerCase()) } },
-              { category:      { $in: scholarshipCategories } },
+              { category: { $in: scholarshipCategories } },
             ],
           },
           { email: 1, name: 1, _id: 0 }
         );
       }
-
-      // Merge them and remove duplicates
       const allEmails = new Set<string>();
       targetUsers = [];
-
       for (const u of [...applicantUsers, ...categoryUsers]) {
-        if (!allEmails.has(u.email)) {
-          allEmails.add(u.email);
-          targetUsers.push({ email: u.email, name: u.name });
-        }
+        if (!allEmails.has(u.email)) { allEmails.add(u.email); targetUsers.push({ email: u.email, name: u.name }); }
       }
-
-      // If none found, send to all users
       if (targetUsers.length === 0) {
         targetUsers = await User.find({}, { email: 1, name: 1, _id: 0 });
       }
 
     } else {
-      // Case B: No scholarship → all registered users
+      // Case D: No filter — all registered users
       targetUsers = await User.find({}, { email: 1, name: 1, _id: 0 });
     }
 
     if (targetUsers.length === 0) {
-      return NextResponse.json({ error: "No user found to send email" }, { status: 404 });
+      return NextResponse.json({ error: "No users found to send email" }, { status: 404 });
     }
 
-    // ── 4. Emails bhejo (batch of 10 to avoid Gmail rate limits) ──
+    // ── 4. Send emails (batch of 10 to avoid Gmail rate limits) ──
     const BATCH_SIZE = 10;
     let successCount = 0;
     let failCount    = 0;
@@ -282,7 +289,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       message: failCount === 0
-        ? `✅ Successfully emailed ${successCount} student${successCount > 1 ? "s" : ""}!`
+        ? `✅ ${successCount} student${successCount > 1 ? "s" : ""} successfully emailed!`
         : `⚠️ ${successCount}/${total} emails sent (${failCount} failed)`,
       successCount,
       failCount,
