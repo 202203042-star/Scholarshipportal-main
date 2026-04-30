@@ -3,6 +3,7 @@ import { useState, useRef, useEffect } from "react";
 import { useSession, signOut } from "next-auth/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 
 const C = {
   navy:"#0f2044", navyMid:"#1a3360",
@@ -70,6 +71,11 @@ const T = {
     contactMsg:"Your Message", contactSend:"Send Message",
     contactSent:"✅ Message sent! We'll get back to you within 24 hours.",
     secureNote:"🔒 Your documents are stored locally in your browser. They are never uploaded to any server.",
+    savedScholarships:"Saved Scholarships",
+    savedScholarshipsDesc:"All scholarships you have bookmarked.",
+    noSaved:"No saved scholarships yet. Click the bookmark icon on any scholarship to save it.",
+    backToHome:"← Back to Home",
+    editProfile:"Edit Profile",
   },
   hi: {
     tagline:"छात्रवृत्ति खोजें और आवेदन करें",
@@ -128,6 +134,11 @@ const T = {
     contactMsg:"आपका संदेश", contactSend:"संदेश भेजें",
     contactSent:"✅ संदेश भेजा गया!",
     secureNote:"🔒 आपके दस्तावेज़ localStorage में सुरक्षित हैं।",
+    savedScholarships:"सहेजी गई छात्रवृत्तियाँ",
+    savedScholarshipsDesc:"आपने जो छात्रवृत्तियाँ बुकमार्क की हैं।",
+    noSaved:"अभी तक कोई सहेजी गई छात्रवृत्ति नहीं।",
+    backToHome:"← होम पर वापस",
+    editProfile:"प्रोफ़ाइल संपादित करें",
   },
   gu: {
     tagline:"શિષ્યવૃત્તિ શોધો અને અરજી કરો",
@@ -186,10 +197,17 @@ const T = {
     contactMsg:"તમારો સંદેશ", contactSend:"સંદેશ મોકલો",
     contactSent:"✅ સંદેશ મોકલ્યો! 24 કલાકમાં જવાબ.",
     secureNote:"🔒 તમારા દસ્તાવેજ localStorage માં સુરક્ષિત છે.",
+    savedScholarships:"સાચવેલ શિષ્યવૃત્તિઓ",
+    savedScholarshipsDesc:"તમે બુકમાર્ક કરેલી બધી શિષ્યવૃત્તિઓ.",
+    noSaved:"હજુ કોઈ સાચવેલ શિષ્યવૃત્તિ નથી.",
+    backToHome:"← હોમ પર પાછા",
+    editProfile:"પ્રોફાઇલ સંપાદિત કરો",
   },
 };
 
 type Lang = "en"|"hi"|"gu";
+type PageView = "home" | "scholarships" | "contact" | "studentProfile" | "documents" | "savedScholarships";
+
 const CATEGORY_OPTIONS = ["All Categories","SC","ST","OBC","General","Minority"];
 const CAST_OPTIONS     = ["SC","ST","OBC","General","Minority"];
 const LEVEL_OPTIONS    = ["All Levels","Central","State","Trust"];
@@ -248,10 +266,10 @@ export default function ScholarshipPage() {
   const t = T[lang];
   const [SCHOLARSHIPS, setScholarships] = useState<Scholarship[]>([]);
   const [scholarshipsLoading, setScholarshipsLoading] = useState(true);
-  const [activeNav, setActiveNav] = useState<"home" | "scholarships" | "contact">("home");
+  const [activeNav, setActiveNav] = useState<PageView>("home");
   const [profile, setProfile] = useState<Profile>({ income: "", category: "SC", course: "Any", state: "Any", gender: "Any" });
   const [savedProfile, setSavedProfile] = useState<Profile | null>(null);
-  const [showProfile, setShowProfile] = useState(false);
+  const [profileSavedToast, setProfileSavedToast] = useState(false);
   const [searchName, setSearchName] = useState("");
   const [searchCategory, setSearchCategory] = useState("All Categories");
   const [searchCourse, setSearchCourse] = useState("Any");
@@ -325,6 +343,9 @@ export default function ScholarshipPage() {
     return nm && cat && crs && lvl && gdr && st;
   }).sort((a, b) => (isRecommended(b, savedProfile) ? 1 : 0) - (isRecommended(a, savedProfile) ? 1 : 0));
 
+  // Saved scholarships filtered list
+  const savedList = SCHOLARSHIPS.filter(s => savedScholarships.includes(String(s._id || s.id)));
+
   function handleDocAdd() {
     const file = fileRef.current?.files?.[0];
     if (!file || !docName.trim()) return;
@@ -335,6 +356,12 @@ export default function ScholarshipPage() {
       setDocToast(true); setTimeout(() => setDocToast(false), 2500);
     };
     reader.readAsDataURL(file);
+  }
+
+  function handleSaveProfile() {
+    setSavedProfile({ ...profile });
+    setProfileSavedToast(true);
+    setTimeout(() => setProfileSavedToast(false), 2500);
   }
 
   const sl = "w-full border border-slate-200 rounded-lg px-3 py-2 text-sm bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition-all";
@@ -367,7 +394,7 @@ export default function ScholarshipPage() {
             <div className="flex items-center h-16 gap-4">
 
               {/* Logo */}
-              <div className="flex items-center gap-2.5 flex-shrink-0">
+              <div className="flex items-center gap-2.5 flex-shrink-0 cursor-pointer" onClick={() => setActiveNav("home")}>
                 <div className="w-9 h-9 rounded-xl flex items-center justify-center text-white text-lg" style={{ background: "linear-gradient(135deg,#0f2044,#1d4ed8)" }}>🎓</div>
                 <p className="font-display font-bold text-slate-900 text-[17px] leading-none">ScholarHub</p>
               </div>
@@ -436,7 +463,7 @@ export default function ScholarshipPage() {
                     <svg className={`w-3 h-3 text-white/70 transition-transform ${showProfileDropdown ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" /></svg>
                   </button>
                   {showProfileDropdown && (
-                    <div className="absolute right-0 mt-1.5 w-56 bg-white border border-slate-100 rounded-2xl shadow-2xl z-50 overflow-hidden">
+                    <div className="absolute right-0 mt-1.5 w-60 bg-white border border-slate-100 rounded-2xl shadow-2xl z-50 overflow-hidden">
                       {/* User info header */}
                       <div className="px-4 pt-4 pb-3 border-b border-slate-100" style={{ background: "linear-gradient(135deg,#0f2044,#1a3360)" }}>
                         <div className="flex items-center gap-3">
@@ -453,10 +480,10 @@ export default function ScholarshipPage() {
                       {/* Menu items */}
                       <div className="p-2">
                         {[
-                          { icon: "✏️", label: "Edit Profile", color: "bg-blue-100", action: () => { setShowProfile(true); setShowProfileDropdown(false); } },
-                          { icon: "📁", label: "Documents", color: "bg-teal-100", action: () => { setShowProfile(true); setShowProfileDropdown(false); } },
-                          { icon: "🔖", label: "Saved Scholarships", color: "bg-amber-100", action: () => { setShowProfileDropdown(false); } },
-                          { icon: "💬", label: "Contact Us", color: "bg-purple-100", action: () => { setActiveNav("contact"); setShowProfileDropdown(false); } },
+                          { icon: "👤", label: t.studentProfile, color: "bg-blue-100", action: () => { setActiveNav("studentProfile"); setShowProfileDropdown(false); } },
+                          { icon: "📁", label: t.docWallet, color: "bg-teal-100", action: () => { setActiveNav("documents"); setShowProfileDropdown(false); } },
+                          { icon: "🔖", label: t.savedScholarships, color: "bg-amber-100", action: () => { setActiveNav("savedScholarships"); setShowProfileDropdown(false); } },
+                          { icon: "💬", label: t.navContact, color: "bg-purple-100", action: () => { setActiveNav("contact"); setShowProfileDropdown(false); } },
                         ].map(({ icon, label, color, action }) => (
                           <button key={label} onClick={action}
                             className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors text-left">
@@ -467,8 +494,10 @@ export default function ScholarshipPage() {
                         <div className="border-t border-slate-100 mt-1 pt-1">
                           <button onClick={() => signOut({ callbackUrl: "/login" })}
                             className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-red-500 hover:bg-red-50 transition-colors text-left">
-                            <div className="w-8 h-8 rounded-lg flex items-center justify-center text-base bg-red-100">🚪</div>
-                            Logout
+                            <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-red-100">
+  <Image src="/logout.png" alt="logout" width={16} height={16} />
+</div>
+                            {t.logout}
                           </button>
                         </div>
                       </div>
@@ -488,10 +517,249 @@ export default function ScholarshipPage() {
           </div>
         </header>
 
+        {/* ── STUDENT PROFILE PAGE ── */}
+        {activeNav === "studentProfile" && (
+          <div className="max-w-4xl mx-auto px-4 py-8">
+            <button onClick={() => setActiveNav("home")} className="flex items-center gap-2 text-sm font-semibold text-slate-500 hover:text-blue-600 mb-6 transition-colors">{t.backToHome}</button>
+
+            {/* Header Card */}
+            <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden mb-6" style={{ boxShadow: "0 4px 24px rgba(15,32,68,0.08)" }}>
+              <div className="px-6 py-6" style={{ background: "linear-gradient(135deg,#0f2044,#1a3360)" }}>
+                <div className="flex items-center gap-4">
+                  <div className="w-16 h-16 rounded-full flex items-center justify-center text-3xl" style={{ background: "rgba(255,255,255,0.15)" }}>👤</div>
+                  <div className="flex-1">
+                    <h2 className="font-display text-2xl font-bold text-white">{session?.user?.name || t.studentProfile}</h2>
+                    <p className="text-white/70 text-sm">{session?.user?.email || "Update your profile to find scholarships"}</p>
+                  </div>
+                  {savedProfile && (
+                    <div className="text-center bg-white/10 rounded-xl px-4 py-2.5">
+                      <p className="text-white/60 text-[10px] uppercase tracking-wide font-bold">Matched</p>
+                      <p className="text-white font-bold text-2xl">{recCount}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Edit form */}
+            <div className="bg-white rounded-2xl border border-slate-200 p-6 mb-6" style={{ boxShadow: "0 4px 24px rgba(15,32,68,0.08)" }}>
+              <h3 className="font-bold text-slate-800 text-lg mb-1">{t.editProfile}</h3>
+              <p className="text-xs text-slate-400 mb-5">Fill your details to get personalized scholarship recommendations</p>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">{t.incomeField}</label>
+                  <input type="number" placeholder="e.g. 250000" value={profile.income} onChange={e => setProfile({ ...profile, income: e.target.value })} className={il} />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">{t.categoryField}</label>
+                  <select value={profile.category} onChange={e => setProfile({ ...profile, category: e.target.value })} className={sl}>{CAST_OPTIONS.map(c => <option key={c}>{c}</option>)}</select>
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">{t.courseField}</label>
+                  <select value={profile.course} onChange={e => setProfile({ ...profile, course: e.target.value })} className={sl}>
+                    <option value="Any">{t.anyOpt}</option><option value="School">{t.school}</option><option value="Engineering">{t.engineering}</option><option value="Medical">{t.medical}</option><option value="Arts">{t.arts}</option><option value="Commerce">{t.commerce}</option><option value="Science">{t.science}</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">{t.genderField}</label>
+                  <select value={profile.gender} onChange={e => setProfile({ ...profile, gender: e.target.value })} className={sl}>
+                    <option value="Any">{t.genderAny}</option><option value="Male">{t.genderMale}</option><option value="Female">{t.genderFemale}</option>
+                  </select>
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">{t.stateField}</label>
+                  <select value={profile.state} onChange={e => setProfile({ ...profile, state: e.target.value })} className={sl}>{STATES.map(s => <option key={s}>{s}</option>)}</select>
+                </div>
+              </div>
+
+              {profileSavedToast && <div className="mt-4 bg-emerald-50 border border-emerald-200 text-emerald-700 text-sm font-medium rounded-xl px-4 py-2.5">✅ Profile saved! {recCount} scholarships matched.</div>}
+
+              <div className="flex gap-3 mt-5">
+                <button onClick={handleSaveProfile}
+                  className="shine-btn flex-1 py-3 rounded-xl text-sm font-bold text-white transition-all hover:opacity-90"
+                  style={{ background: "linear-gradient(135deg,#0f2044,#1d4ed8)", boxShadow: "0 2px 8px rgba(29,78,216,0.25)" }}>
+                  {t.updateProfile}
+                </button>
+                {savedProfile && (
+                  <button onClick={() => { setSavedProfile(null); setProfile({ income:"", category:"SC", course:"Any", state:"Any", gender:"Any" }); }}
+                    className="px-5 py-3 rounded-xl text-sm font-bold text-red-600 border border-red-200 hover:bg-red-50 transition-all">
+                    Clear ✕
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Saved profile preview */}
+            {savedProfile && (
+              <div className="bg-white rounded-2xl border border-slate-200 p-6" style={{ boxShadow: "0 4px 24px rgba(15,32,68,0.08)" }}>
+                <h3 className="font-bold text-slate-800 text-lg mb-4">Your Saved Profile</h3>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                  {[[`💰 ${t.incomeField}`,`₹${parseInt(savedProfile.income||"0").toLocaleString("en-IN")}`],[`🏷️ ${t.categoryField}`,savedProfile.category],[`📚 ${t.courseField}`,courseLabel(savedProfile.course)],[`🗺️ ${t.stateField}`,savedProfile.state],[`👤 ${t.genderField}`,savedProfile.gender==="Male"?t.genderMale:savedProfile.gender==="Female"?t.genderFemale:t.genderAny]].map(([l,v]) => (
+                    <div key={l} className="bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-3">
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">{l}</p>
+                      <p className="text-sm font-bold text-slate-800 mt-0.5">{v}</p>
+                    </div>
+                  ))}
+                </div>
+                <button onClick={() => setActiveNav("scholarships")}
+                  className="shine-btn w-full mt-5 py-3 rounded-xl text-sm font-bold text-white transition-all hover:opacity-90"
+                  style={{ background: `linear-gradient(135deg,${C.green},${C.recGreen})` }}>
+                  View {recCount} Matched Scholarships →
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── DOCUMENTS PAGE ── */}
+        {activeNav === "documents" && (
+          <div className="max-w-4xl mx-auto px-4 py-8">
+            <button onClick={() => setActiveNav("home")} className="flex items-center gap-2 text-sm font-semibold text-slate-500 hover:text-blue-600 mb-6 transition-colors">{t.backToHome}</button>
+
+            <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden mb-6" style={{ boxShadow: "0 4px 24px rgba(15,32,68,0.08)" }}>
+              <div className="px-6 py-6" style={{ background: "linear-gradient(135deg,#0f2044,#1a3360)" }}>
+                <div className="flex items-center gap-4">
+                  <div className="w-16 h-16 rounded-full flex items-center justify-center text-3xl" style={{ background: "rgba(255,255,255,0.15)" }}>📁</div>
+                  <div className="flex-1">
+                    <h2 className="font-display text-2xl font-bold text-white">{t.docWallet}</h2>
+                    <p className="text-white/70 text-sm">{t.docWalletDesc}</p>
+                  </div>
+                  <div className="text-center bg-white/10 rounded-xl px-4 py-2.5">
+                    <p className="text-white/60 text-[10px] uppercase tracking-wide font-bold">Total</p>
+                    <p className="text-white font-bold text-2xl">{docs.length}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 mb-5 text-xs text-blue-700 font-medium flex items-start gap-2">
+              <span>{t.secureNote}</span>
+            </div>
+
+            {/* Add Document */}
+            <div className="bg-white rounded-2xl border border-slate-200 p-6 mb-6" style={{ boxShadow: "0 4px 24px rgba(15,32,68,0.08)" }}>
+              <h3 className="font-bold text-slate-800 text-lg mb-4">{t.addDocument}</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div>
+                  <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1.5 block">{t.docName}</label>
+                  <input type="text" placeholder="e.g. Aadhaar Card" value={docName} onChange={e => setDocName(e.target.value)} className={il} />
+                </div>
+                <div>
+                  <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1.5 block">{t.docFile}</label>
+                  <input ref={fileRef} type="file" accept=".pdf,.jpg,.jpeg,.png" className="w-full border border-slate-200 rounded-lg px-3 py-2.5 text-xs bg-white text-slate-600 file:mr-2 file:py-1 file:px-3 file:rounded file:border-0 file:text-xs file:bg-blue-50 file:text-blue-700 file:font-bold" />
+                </div>
+              </div>
+              <button onClick={handleDocAdd}
+                className="shine-btn w-full py-3 rounded-xl text-sm font-bold text-white transition-all hover:opacity-90"
+                style={{ background: "linear-gradient(135deg,#0f2044,#1d4ed8)" }}>
+                + {t.addDocument}
+              </button>
+              {docToast && <div className="mt-4 bg-emerald-50 border border-emerald-200 text-emerald-700 text-sm font-medium rounded-xl px-4 py-2.5">✅ {t.docAdded}</div>}
+            </div>
+
+            {/* Documents List */}
+            <div className="bg-white rounded-2xl border border-slate-200 p-6" style={{ boxShadow: "0 4px 24px rgba(15,32,68,0.08)" }}>
+              <h3 className="font-bold text-slate-800 text-lg mb-4">All Documents ({docs.length})</h3>
+              {docs.length === 0
+                ? <div className="text-center py-12 text-slate-400 text-sm border-2 border-dashed border-slate-200 rounded-xl">📂 {t.noDocuments}</div>
+                : <div className="space-y-2">
+                  {docs.map(d => (
+                    <div key={d.id} className="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 hover:border-blue-300 transition-colors">
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
+                        <span className="text-2xl flex-shrink-0">{d.fileName.endsWith(".pdf") ? "📄" : "🖼️"}</span>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-semibold text-slate-800 truncate">{d.name}</p>
+                          <p className="text-xs text-slate-400 truncate">{d.fileName}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3 flex-shrink-0 ml-2">
+                        <a href={d.dataUrl} download={d.fileName} className="text-xs text-blue-600 hover:underline font-bold px-3 py-1.5 rounded-lg hover:bg-blue-50">↓ Download</a>
+                        <button onClick={() => setDocs(prev => prev.filter(x => x.id !== d.id))} className="text-xs text-red-500 hover:text-red-700 font-bold px-3 py-1.5 rounded-lg hover:bg-red-50">{t.remove}</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              }
+            </div>
+          </div>
+        )}
+
+        {/* ── SAVED SCHOLARSHIPS PAGE ── */}
+        {activeNav === "savedScholarships" && (
+          <div className="max-w-6xl mx-auto px-4 py-8">
+            <button onClick={() => setActiveNav("home")} className="flex items-center gap-2 text-sm font-semibold text-slate-500 hover:text-blue-600 mb-6 transition-colors">{t.backToHome}</button>
+
+            <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden mb-6" style={{ boxShadow: "0 4px 24px rgba(15,32,68,0.08)" }}>
+              <div className="px-6 py-6" style={{ background: "linear-gradient(135deg,#b45309,#d97706)" }}>
+                <div className="flex items-center gap-4">
+                  <div className="w-16 h-16 rounded-full flex items-center justify-center text-3xl" style={{ background: "rgba(255,255,255,0.15)" }}>🔖</div>
+                  <div className="flex-1">
+                    <h2 className="font-display text-2xl font-bold text-white">{t.savedScholarships}</h2>
+                    <p className="text-white/80 text-sm">{t.savedScholarshipsDesc}</p>
+                  </div>
+                  <div className="text-center bg-white/10 rounded-xl px-4 py-2.5">
+                    <p className="text-white/70 text-[10px] uppercase tracking-wide font-bold">Saved</p>
+                    <p className="text-white font-bold text-2xl">{savedList.length}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {savedList.length === 0 ? (
+              <div className="bg-white rounded-2xl border-2 border-dashed border-slate-200 p-12 text-center">
+                <div className="text-5xl mb-4">🔖</div>
+                <p className="text-slate-500 font-semibold text-base mb-2">{t.noSaved}</p>
+                <button onClick={() => setActiveNav("scholarships")}
+                  className="mt-4 shine-btn px-6 py-2.5 rounded-xl text-sm font-bold text-white transition-all hover:opacity-90"
+                  style={{ background: "linear-gradient(135deg,#0f2044,#1d4ed8)" }}>
+                  Browse Scholarships →
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {savedList.map(s => (
+                  <div key={s._id || s.id} className="bg-white rounded-2xl border border-slate-200 p-5 card-hover" style={{ boxShadow: "0 2px 12px rgba(15,32,68,0.06)" }}>
+                    <div className="flex items-start justify-between gap-3 mb-3">
+                      <h3 className="font-bold text-slate-800 text-sm leading-snug flex-1">{sName(s)}</h3>
+                      <button
+                        onClick={() => {
+                          const id = String(s._id || s.id);
+                          setSavedScholarships(prev => prev.filter(x => x !== id));
+                        }}
+                        className="w-8 h-8 flex items-center justify-center rounded-full bg-amber-400 text-white hover:bg-red-500 transition-all flex-shrink-0">
+                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" /></svg>
+                      </button>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5 mb-3">
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${catBadge(s.category)}`}>{sCategory(s)}</span>
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${lvlBadge(s.level)}`}>{s.level === "Central" ? t.central : s.level === "State" ? t.stateLvl : t.trust}</span>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">{sAmount(s)}</span>
+                    </div>
+                    <p className="text-xs text-slate-500 mb-3 line-clamp-2">{s.description}</p>
+                    <div className="flex gap-2">
+                      <button onClick={() => setDetailS(s)}
+                        className="flex-1 text-xs font-bold px-3 py-2 rounded-lg text-white transition-all hover:opacity-90"
+                        style={{ background: "linear-gradient(135deg,#0891b2,#0e7490)" }}>
+                        {t.details}
+                      </button>
+                      <button onClick={() => setApplyS(s)}
+                        className="flex-1 shine-btn text-xs font-bold px-3 py-2 rounded-lg text-white transition-all hover:opacity-90"
+                        style={{ background: "linear-gradient(135deg,#059669,#047857)" }}>
+                        {t.apply}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* ── CONTACT PAGE ── */}
         {activeNav === "contact" && (
           <div className="max-w-2xl mx-auto px-4 py-12">
-            <button onClick={() => setActiveNav("home")} className="flex items-center gap-2 text-sm font-semibold text-slate-500 hover:text-blue-600 mb-8 transition-colors">← Back to Home</button>
+            <button onClick={() => setActiveNav("home")} className="flex items-center gap-2 text-sm font-semibold text-slate-500 hover:text-blue-600 mb-8 transition-colors">{t.backToHome}</button>
             <div className="bg-white rounded-2xl border border-slate-200 p-8" style={{ boxShadow: "0 4px 32px rgba(15,32,68,0.08)" }}>
               <h2 className="font-display text-3xl font-bold text-slate-900 mb-1">{t.contactTitle}</h2>
               <p className="text-sm text-slate-400 mb-8">{t.contactSub}</p>
@@ -517,7 +785,7 @@ export default function ScholarshipPage() {
           </div>
         )}
 
-        {/* ── MAIN CONTENT ── */}
+        {/* ── MAIN CONTENT (HOME / SCHOLARSHIPS) ── */}
         {(activeNav === "home" || activeNav === "scholarships") && (<>
 
           {/* Hero Banner */}
@@ -531,15 +799,14 @@ export default function ScholarshipPage() {
                 {/* Stat pills */}
                 <div className="flex flex-wrap gap-3">
                   {[
-                    { emoji:"🎓", label: t.totalScholarships, value: SCHOLARSHIPS.length, sub: "Available to apply" },
-                    { emoji:"⭐", label: t.recommended, value: recCount, sub: "Matching your filters" },
-                  ].map(({ emoji, label, value, sub }) => (
+                    { emoji:"🎓", label: t.totalScholarships, value: SCHOLARSHIPS.length },
+                    { emoji:"⭐", label: t.recommended, value: recCount },
+                  ].map(({ emoji, label, value }) => (
                     <div key={label} className="bg-white/10 border border-white/20 rounded-2xl px-7 py-4 text-center backdrop-blur-sm">
                       <p className="text-3xl font-bold text-white">{emoji} {value}</p>
                       <p className="text-blue-200 text-xs font-semibold mt-1">{label}</p>
                     </div>
                   ))}
-                  {/* Study Abroad Card */}
                   <Link href="/study-abroad"
                     className="group bg-white/10 border border-white/20 rounded-2xl px-7 py-4 text-center backdrop-blur-sm hover:bg-white/20 transition-all cursor-pointer block">
                     <p className="text-3xl font-bold text-white">🌍 18</p>
@@ -551,7 +818,7 @@ export default function ScholarshipPage() {
             </div>
           </section>
 
-          {/* Profile Form */}
+          {/* Quick Profile Form */}
           <section className="max-w-7xl mx-auto px-4 sm:px-6 -mt-4 mb-4 relative z-10">
             <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden card-hover" style={{ boxShadow: "0 4px 24px rgba(15,32,68,0.08)" }}>
               <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-3" style={{ background: "linear-gradient(to right,#f8fafc,#f0f4ff)" }}>
@@ -565,6 +832,11 @@ export default function ScholarshipPage() {
                     ✅ {recCount} {t.scholarshipsRecommended}
                   </span>
                 )}
+                <button onClick={() => setActiveNav("studentProfile")}
+                  className={`text-xs font-bold px-3 py-1.5 rounded-lg text-white transition-all hover:opacity-90 ${savedProfile ? '' : 'ml-auto'}`}
+                  style={{ background: "linear-gradient(135deg,#0f2044,#1d4ed8)" }}>
+                  {t.editProfile} →
+                </button>
               </div>
               <div className="px-6 py-5">
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
@@ -581,7 +853,7 @@ export default function ScholarshipPage() {
                     <div key={lbl}><label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">{lbl}</label>{el}</div>
                   ))}
                   <div className="flex flex-col gap-2 items-stretch">
-                    <button onClick={() => setSavedProfile({ ...profile })}
+                    <button onClick={handleSaveProfile}
                       className="shine-btn w-full py-2 px-3 rounded-lg text-xs font-bold text-white transition-all hover:opacity-90"
                       style={{ background: "linear-gradient(135deg,#0f2044,#1d4ed8)", boxShadow: "0 2px 8px rgba(29,78,216,0.25)" }}>
                       {t.updateProfile}
@@ -625,7 +897,6 @@ export default function ScholarshipPage() {
           <section className="max-w-7xl mx-auto px-4 sm:px-6 pb-16">
             <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden" style={{ boxShadow: "0 4px 24px rgba(15,32,68,0.08)" }}>
 
-              {/* Table header */}
               <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-3" style={{ background: "linear-gradient(135deg,#0f2044,#1a3360)" }}>
                 <span className="text-xl">🏆</span>
                 <h2 className="font-display font-bold text-white text-lg">{t.scholarships}</h2>
@@ -653,8 +924,9 @@ export default function ScholarshipPage() {
                     <tbody>
                       {displayed.map((s, i) => {
                         const rec = isRecommended(s, savedProfile);
+                        const id = String(s._id || s.id);
                         return (
-                          <tr key={s._id || s.id}
+                          <tr key={id}
                             className={`border-b border-slate-50 hover:bg-blue-50/30 transition-colors ${rec ? "rec-row" : "norm-row"}`}
                             style={{ background: i % 2 === 0 ? "#ffffff" : "#fafbff" }}>
                             <td className="px-5 py-4">
@@ -701,25 +973,21 @@ export default function ScholarshipPage() {
                                   style={{ background: "linear-gradient(135deg,#059669,#047857)" }}>
                                   {t.apply}
                                 </button>
-                                {/* Notification button */}
                                 <button
                                   onClick={() => {
-                                    const id = String(s._id || s.id);
                                     setNotifiedScholarships(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
                                   }}
                                   title="Set deadline reminder"
-                                  className={`w-8 h-8 flex items-center justify-center rounded-full border transition-all ${notifiedScholarships.includes(String(s._id || s.id)) ? "bg-blue-500 border-blue-500 text-white" : "bg-white border-slate-200 text-slate-400 hover:border-blue-400 hover:text-blue-500"}`}>
-                                  <svg className="w-3.5 h-3.5" fill={notifiedScholarships.includes(String(s._id || s.id)) ? "currentColor" : "none"} viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
+                                  className={`w-8 h-8 flex items-center justify-center rounded-full border transition-all ${notifiedScholarships.includes(id) ? "bg-blue-500 border-blue-500 text-white" : "bg-white border-slate-200 text-slate-400 hover:border-blue-400 hover:text-blue-500"}`}>
+                                  <svg className="w-3.5 h-3.5" fill={notifiedScholarships.includes(id) ? "currentColor" : "none"} viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
                                 </button>
-                                {/* Save/Bookmark button */}
                                 <button
                                   onClick={() => {
-                                    const id = String(s._id || s.id);
                                     setSavedScholarships(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
                                   }}
                                   title="Save scholarship"
-                                  className={`w-8 h-8 flex items-center justify-center rounded-full border transition-all ${savedScholarships.includes(String(s._id || s.id)) ? "bg-amber-400 border-amber-400 text-white" : "bg-white border-slate-200 text-slate-400 hover:border-amber-400 hover:text-amber-500"}`}>
-                                  <svg className="w-3.5 h-3.5" fill={savedScholarships.includes(String(s._id || s.id)) ? "currentColor" : "none"} viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" /></svg>
+                                  className={`w-8 h-8 flex items-center justify-center rounded-full border transition-all ${savedScholarships.includes(id) ? "bg-amber-400 border-amber-400 text-white" : "bg-white border-slate-200 text-slate-400 hover:border-amber-400 hover:text-amber-500"}`}>
+                                  <svg className="w-3.5 h-3.5" fill={savedScholarships.includes(id) ? "currentColor" : "none"} viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" /></svg>
                                 </button>
                               </div>
                             </td>
@@ -818,81 +1086,6 @@ export default function ScholarshipPage() {
               {applyS.applyLink && <a href={applyS.applyLink} target="_blank" rel="noopener noreferrer" className="shine-btn flex-1 text-center text-sm font-bold text-white py-2.5 rounded-xl hover:opacity-90 transition-all" style={{ background: `linear-gradient(135deg,${C.green},${C.recGreen})` }}>{t.applyOnSite}</a>}
               {applyS.youtubeLink && <a href={applyS.youtubeLink} target="_blank" rel="noopener noreferrer" className="shine-btn flex items-center gap-2 text-sm font-bold text-white py-2.5 px-5 rounded-xl hover:opacity-90 transition-all" style={{ background: "linear-gradient(135deg,#dc2626,#b91c1c)" }}>{t.watchVideo}</a>}
             </div>
-          </Modal>
-        )}
-
-        {/* ── PROFILE MODAL ── */}
-        {showProfile && (
-          <Modal onClose={() => setShowProfile(false)} wide>
-            <div className="-mx-6 -mt-6 px-6 pt-6 pb-5 rounded-t-2xl mb-5" style={{ background: "linear-gradient(135deg,#0f2044,#1a3360)" }}>
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-full flex items-center justify-center text-2xl" style={{ background: "rgba(255,255,255,0.12)" }}>👤</div>
-                <div>
-                  <h3 className="font-display text-white font-bold text-xl">{session?.user?.name || t.profileModal}</h3>
-                  <p className="text-white/60 text-sm">{session?.user?.email || (savedProfile ? `${savedProfile.category} · ${savedProfile.state}` : "No profile saved yet")}</p>
-                </div>
-                {savedProfile && (
-                  <div className="ml-auto text-center bg-white/10 rounded-xl px-4 py-2">
-                    <p className="text-white/60 text-[10px] uppercase tracking-wide font-bold">Matched</p>
-                    <p className="text-white font-bold text-2xl">{recCount}</p>
-                  </div>
-                )}
-              </div>
-            </div>
-            {savedProfile && (
-              <div className="grid grid-cols-2 gap-3 mb-5">
-                {[[`💰 ${t.incomeField}`,`₹${parseInt(savedProfile.income||"0").toLocaleString("en-IN")}`],[`🏷️ ${t.categoryField}`,savedProfile.category],[`📚 ${t.courseField}`,courseLabel(savedProfile.course)],[`🗺️ ${t.stateField}`,savedProfile.state],[`👤 ${t.genderField}`,savedProfile.gender==="Male"?t.genderMale:savedProfile.gender==="Female"?t.genderFemale:t.genderAny]].map(([l,v]) => (
-                  <div key={l} className="bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-3">
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">{l}</p>
-                    <p className="text-sm font-bold text-slate-800 mt-0.5">{v}</p>
-                  </div>
-                ))}
-              </div>
-            )}
-            <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 mb-5 text-xs text-blue-700 font-medium flex items-start gap-2">
-              <span>{t.secureNote}</span>
-            </div>
-            <div className="border-t border-slate-100 pt-5">
-              <h4 className="font-bold text-slate-800 text-sm mb-1">{t.docWallet}</h4>
-              <p className="text-xs text-slate-400 mb-4">{t.docWalletDesc}</p>
-              <div className="flex flex-wrap gap-3 mb-4 items-end">
-                <div className="flex-1 min-w-[130px]">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-1 block">{t.docName}</label>
-                  <input type="text" placeholder="e.g. Aadhaar Card" value={docName} onChange={e => setDocName(e.target.value)} className={il} />
-                </div>
-                <div className="flex-1 min-w-[130px]">
-                  <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-1 block">{t.docFile}</label>
-                  <input ref={fileRef} type="file" accept=".pdf,.jpg,.jpeg,.png" className="w-full border border-slate-200 rounded-lg px-3 py-2 text-xs bg-white text-slate-600 file:mr-2 file:py-0.5 file:px-2 file:rounded file:border-0 file:text-xs file:bg-blue-50 file:text-blue-700" />
-                </div>
-                <button onClick={handleDocAdd}
-                  className="shine-btn text-sm font-bold text-white px-4 py-2 rounded-lg hover:opacity-90 transition-all whitespace-nowrap"
-                  style={{ background: "linear-gradient(135deg,#0f2044,#1d4ed8)" }}>
-                  + {t.addDocument}
-                </button>
-              </div>
-              {docToast && <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 text-sm font-medium rounded-xl px-4 py-2 mb-3">✅ {t.docAdded}</div>}
-              {docs.length === 0
-                ? <div className="text-center py-8 text-slate-400 text-sm border-2 border-dashed border-slate-200 rounded-xl">📂 {t.noDocuments}</div>
-                : <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
-                  {docs.map(d => (
-                    <div key={d.id} className="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-xl px-4 py-3">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <span className="text-xl flex-shrink-0">{d.fileName.endsWith(".pdf") ? "📄" : "🖼️"}</span>
-                        <div className="min-w-0">
-                          <p className="text-sm font-semibold text-slate-800 truncate">{d.name}</p>
-                          <p className="text-xs text-slate-400 truncate">{d.fileName}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3 flex-shrink-0 ml-2">
-                        <a href={d.dataUrl} download={d.fileName} className="text-xs text-blue-600 hover:underline font-medium">↓ Download</a>
-                        <button onClick={() => setDocs(prev => prev.filter(x => x.id !== d.id))} className="text-xs text-red-500 hover:text-red-700 font-medium">{t.remove}</button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              }
-            </div>
-            <button onClick={() => setShowProfile(false)} className="mt-5 w-full border border-slate-200 text-slate-500 hover:bg-slate-50 font-semibold py-2.5 rounded-xl text-sm transition-colors">Close</button>
           </Modal>
         )}
       </div>
