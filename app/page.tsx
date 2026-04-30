@@ -266,6 +266,12 @@ export default function ScholarshipPage() {
   const [contactForm, setContactForm] = useState({ name: "", email: "", msg: "" });
   const [contactSent, setContactSent] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const [savedScholarships, setSavedScholarships] = useState<string[]>([]);
+  const [notifiedScholarships, setNotifiedScholarships] = useState<string[]>([]);
+  const [showProfileDropdown, setShowProfileDropdown] = useState(false);
+  const [showLangDropdown, setShowLangDropdown] = useState(false);
+  const profileDropdownRef = useRef<HTMLDivElement>(null);
+  const langDropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     fetch("/api/scholarships").then(r => r.json())
@@ -279,6 +285,8 @@ export default function ScholarshipPage() {
       const pf = localStorage.getItem("sh_profileForm"); if (pf) setProfile(JSON.parse(pf));
       const dc = localStorage.getItem("sh_docs"); if (dc) setDocs(JSON.parse(dc));
       const lg = localStorage.getItem("sh_lang"); if (lg) setLang(lg as Lang);
+      const ss = localStorage.getItem("sh_saved_scholarships"); if (ss) setSavedScholarships(JSON.parse(ss));
+      const nt = localStorage.getItem("sh_notified_scholarships"); if (nt) setNotifiedScholarships(JSON.parse(nt));
     } catch {}
   }, []);
 
@@ -286,6 +294,16 @@ export default function ScholarshipPage() {
   useEffect(() => { try { if (savedProfile) localStorage.setItem("sh_profile", JSON.stringify(savedProfile)); } catch {} }, [savedProfile]);
   useEffect(() => { try { localStorage.setItem("sh_docs", JSON.stringify(docs)); } catch {} }, [docs]);
   useEffect(() => { try { localStorage.setItem("sh_lang", lang); } catch {} }, [lang]);
+  useEffect(() => { try { localStorage.setItem("sh_saved_scholarships", JSON.stringify(savedScholarships)); } catch {} }, [savedScholarships]);
+  useEffect(() => { try { localStorage.setItem("sh_notified_scholarships", JSON.stringify(notifiedScholarships)); } catch {} }, [notifiedScholarships]);
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (profileDropdownRef.current && !profileDropdownRef.current.contains(e.target as Node)) setShowProfileDropdown(false);
+      if (langDropdownRef.current && !langDropdownRef.current.contains(e.target as Node)) setShowLangDropdown(false);
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const sName = (s: Scholarship) => { if (lang === "hi" && s.titleHi) return s.titleHi; if (lang === "gu" && s.titleGu) return s.titleGu; return s.title || s.name || ""; };
   const sAmount = (s: Scholarship) => typeof s.amount === "number" ? `₹${s.amount.toLocaleString("en-IN")}` : s.amount;
@@ -367,9 +385,6 @@ export default function ScholarshipPage() {
                     </button>
                   );
                 })}
-                <Link href="/study-abroad" className="px-4 py-2 rounded-lg text-sm font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-all">
-                  {t.navStudyAbroad}
-                </Link>
               </nav>
 
               {/* Search */}
@@ -381,38 +396,85 @@ export default function ScholarshipPage() {
 
               {/* Right section */}
               <div className="flex items-center gap-2 ml-auto">
-                {/* Language switcher */}
-                <div className="flex rounded-lg overflow-hidden border border-slate-200 text-xs font-bold flex-shrink-0">
-                  {(["en","hi","gu"] as Lang[]).map(l => (
-                    <button key={l} onClick={() => setLang(l)}
-                      className={`px-2.5 py-1.5 transition-colors ${lang === l ? "text-white" : "bg-white text-slate-500 hover:bg-slate-50"}`}
-                      style={lang === l ? { background: "linear-gradient(135deg,#0f2044,#1d4ed8)" } : {}}>
-                      {l === "en" ? "EN" : l === "hi" ? "हिं" : "ગુ"}
-                    </button>
-                  ))}
+                {/* Language dropdown */}
+                <div className="relative flex-shrink-0" ref={langDropdownRef}>
+                  <button onClick={() => setShowLangDropdown(v => !v)}
+                    className="flex items-center gap-1.5 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold px-3 py-1.5 rounded-lg transition-all">
+                    <svg className="w-3.5 h-3.5 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 004 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                    <span>{lang === "en" ? "English" : lang === "hi" ? "हिंदी" : "ગુજરાતી"}</span>
+                    <svg className={`w-3 h-3 text-slate-400 transition-transform ${showLangDropdown ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" /></svg>
+                  </button>
+                  {showLangDropdown && (
+                    <div className="absolute right-0 mt-1.5 w-36 bg-white border border-slate-100 rounded-xl shadow-xl z-50 overflow-hidden">
+                      {([["en","English"],["hi","हिंदी"],["gu","ગુજરાતી"]] as [Lang,string][]).map(([l, label]) => (
+                        <button key={l} onClick={() => { setLang(l); setShowLangDropdown(false); }}
+                          className={`w-full text-left px-4 py-2.5 text-sm font-medium transition-colors ${lang === l ? "bg-blue-50 text-blue-700 font-bold" : "text-slate-700 hover:bg-slate-50"}`}>
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
-                {session ? (
-                  <div className="flex items-center gap-2">
-                    <span className="hidden sm:inline text-sm font-medium text-slate-700">👋 {session.user?.name?.split(" ")[0]}</span>
-                    <button onClick={() => signOut({ callbackUrl: "/login" })}
-                      className="text-sm font-semibold text-red-500 border border-red-200 px-3 py-1.5 rounded-lg hover:bg-red-50 transition-all">
-                      {t.logout}
-                    </button>
-                  </div>
-                ) : (
-                  <Link href="/login"
-                    className="shine-btn text-sm font-semibold text-white px-4 py-1.5 rounded-lg transition-all hover:opacity-90 flex-shrink-0"
-                    style={{ background: "linear-gradient(135deg,#0f2044,#1d4ed8)" }}>
-                    Login
-                  </Link>
-                )}
-
-                <button onClick={() => setShowProfile(true)}
-                  className="flex items-center gap-1.5 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold px-3 py-1.5 rounded-lg transition-all hover:border-blue-300 hover:text-blue-700 flex-shrink-0">
-                  <span className="text-base leading-none">👤</span>
-                  <span className="hidden sm:inline">{t.profile}</span>
+                {/* Notification bell */}
+                <button className="relative w-8 h-8 flex items-center justify-center rounded-lg border border-slate-200 bg-white hover:bg-slate-50 transition-all flex-shrink-0">
+                  <svg className="w-4 h-4 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
+                  {notifiedScholarships.length > 0 && (
+                    <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center">{notifiedScholarships.length}</span>
+                  )}
                 </button>
+
+                {/* Profile dropdown */}
+                <div className="relative flex-shrink-0" ref={profileDropdownRef}>
+                  <button onClick={() => setShowProfileDropdown(v => !v)}
+                    className="flex items-center gap-2 text-sm font-semibold text-white px-3 py-1.5 rounded-lg transition-all"
+                    style={{ background: "linear-gradient(135deg,#1d4ed8,#0f2044)" }}>
+                    <div className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center text-xs font-bold">
+                      {(session?.user?.name || "U")[0].toUpperCase()}
+                    </div>
+                    <span className="hidden sm:inline">{session?.user?.name?.split(" ")[0] || "Profile"}</span>
+                    <svg className={`w-3 h-3 text-white/70 transition-transform ${showProfileDropdown ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" /></svg>
+                  </button>
+                  {showProfileDropdown && (
+                    <div className="absolute right-0 mt-1.5 w-56 bg-white border border-slate-100 rounded-2xl shadow-2xl z-50 overflow-hidden">
+                      {/* User info header */}
+                      <div className="px-4 pt-4 pb-3 border-b border-slate-100" style={{ background: "linear-gradient(135deg,#0f2044,#1a3360)" }}>
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm text-white" style={{ background: "rgba(255,255,255,0.15)" }}>
+                            {(session?.user?.name || "U")[0].toUpperCase()}
+                          </div>
+                          <div>
+                            <p className="text-white font-bold text-sm">{session?.user?.name || "Student"}</p>
+                            <p className="text-white/60 text-[11px]">{session?.user?.email || "student@example.com"}</p>
+                            <span className="inline-block mt-0.5 text-[9px] font-bold text-amber-300 bg-white/10 px-2 py-0.5 rounded-full">◎ STUDENT</span>
+                          </div>
+                        </div>
+                      </div>
+                      {/* Menu items */}
+                      <div className="p-2">
+                        {[
+                          { icon: "✏️", label: "Edit Profile", color: "bg-blue-100", action: () => { setShowProfile(true); setShowProfileDropdown(false); } },
+                          { icon: "📁", label: "Documents", color: "bg-teal-100", action: () => { setShowProfile(true); setShowProfileDropdown(false); } },
+                          { icon: "🔖", label: "Saved Scholarships", color: "bg-amber-100", action: () => { setShowProfileDropdown(false); } },
+                          { icon: "💬", label: "Contact Us", color: "bg-purple-100", action: () => { setActiveNav("contact"); setShowProfileDropdown(false); } },
+                        ].map(({ icon, label, color, action }) => (
+                          <button key={label} onClick={action}
+                            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors text-left">
+                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-base ${color}`}>{icon}</div>
+                            {label}
+                          </button>
+                        ))}
+                        <div className="border-t border-slate-100 mt-1 pt-1">
+                          <button onClick={() => signOut({ callbackUrl: "/login" })}
+                            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-red-500 hover:bg-red-50 transition-colors text-left">
+                            <div className="w-8 h-8 rounded-lg flex items-center justify-center text-base bg-red-100">🚪</div>
+                            Logout
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -469,15 +531,21 @@ export default function ScholarshipPage() {
                 {/* Stat pills */}
                 <div className="flex flex-wrap gap-3">
                   {[
-                    { emoji:"🎓", label: t.totalScholarships, value: SCHOLARSHIPS.length },
-                    { emoji:"⭐", label: t.recommended, value: recCount },
-                    { emoji:"💰", label: t.studentIncome, value: savedProfile?.income ? `₹${parseInt(savedProfile.income).toLocaleString("en-IN")}` : "—" },
-                  ].map(({ emoji, label, value }) => (
+                    { emoji:"🎓", label: t.totalScholarships, value: SCHOLARSHIPS.length, sub: "Available to apply" },
+                    { emoji:"⭐", label: t.recommended, value: recCount, sub: "Matching your filters" },
+                  ].map(({ emoji, label, value, sub }) => (
                     <div key={label} className="bg-white/10 border border-white/20 rounded-2xl px-7 py-4 text-center backdrop-blur-sm">
                       <p className="text-3xl font-bold text-white">{emoji} {value}</p>
                       <p className="text-blue-200 text-xs font-semibold mt-1">{label}</p>
                     </div>
                   ))}
+                  {/* Study Abroad Card */}
+                  <Link href="/study-abroad"
+                    className="group bg-white/10 border border-white/20 rounded-2xl px-7 py-4 text-center backdrop-blur-sm hover:bg-white/20 transition-all cursor-pointer block">
+                    <p className="text-3xl font-bold text-white">🌍 18</p>
+                    <p className="text-blue-200 text-xs font-semibold mt-1">{t.navStudyAbroad}</p>
+                    <p className="text-amber-300 text-[10px] font-bold mt-1 group-hover:underline">Click here for scholarship ↗</p>
+                  </Link>
                 </div>
               </div>
             </div>
@@ -622,7 +690,7 @@ export default function ScholarshipPage() {
                               <span className="font-bold text-emerald-700 text-sm">{sAmount(s)}</span>
                             </td>
                             <td className="px-4 py-4">
-                              <div className="flex gap-2">
+                              <div className="flex gap-2 items-center">
                                 <button onClick={() => setDetailS(s)}
                                   className="text-xs font-bold px-3.5 py-1.5 rounded-lg text-white transition-all hover:opacity-90"
                                   style={{ background: "linear-gradient(135deg,#0891b2,#0e7490)" }}>
@@ -632,6 +700,26 @@ export default function ScholarshipPage() {
                                   className="shine-btn text-xs font-bold px-3.5 py-1.5 rounded-lg text-white transition-all hover:opacity-90"
                                   style={{ background: "linear-gradient(135deg,#059669,#047857)" }}>
                                   {t.apply}
+                                </button>
+                                {/* Notification button */}
+                                <button
+                                  onClick={() => {
+                                    const id = String(s._id || s.id);
+                                    setNotifiedScholarships(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+                                  }}
+                                  title="Set deadline reminder"
+                                  className={`w-8 h-8 flex items-center justify-center rounded-full border transition-all ${notifiedScholarships.includes(String(s._id || s.id)) ? "bg-blue-500 border-blue-500 text-white" : "bg-white border-slate-200 text-slate-400 hover:border-blue-400 hover:text-blue-500"}`}>
+                                  <svg className="w-3.5 h-3.5" fill={notifiedScholarships.includes(String(s._id || s.id)) ? "currentColor" : "none"} viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
+                                </button>
+                                {/* Save/Bookmark button */}
+                                <button
+                                  onClick={() => {
+                                    const id = String(s._id || s.id);
+                                    setSavedScholarships(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+                                  }}
+                                  title="Save scholarship"
+                                  className={`w-8 h-8 flex items-center justify-center rounded-full border transition-all ${savedScholarships.includes(String(s._id || s.id)) ? "bg-amber-400 border-amber-400 text-white" : "bg-white border-slate-200 text-slate-400 hover:border-amber-400 hover:text-amber-500"}`}>
+                                  <svg className="w-3.5 h-3.5" fill={savedScholarships.includes(String(s._id || s.id)) ? "currentColor" : "none"} viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" /></svg>
                                 </button>
                               </div>
                             </td>
