@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 import Scholarship from "@/models/Scholarship";
 import ScholarshipList from "@/components/admin/ScholarshipList";
 import connectDB from "@/lib/mongodb";
