@@ -56,9 +56,10 @@ const STATIC_ABROAD_DATA = [
 ];
 
 const notifTypeConfig: Record<string, { bg: string; color: string; border: string; label: string; emoji: string; gradFrom: string; gradTo: string }> = {
-  info:    { bg: "#eff6ff", color: "#2563eb", border: "#bfdbfe", label: "Info",    emoji: "ℹ️", gradFrom: "#3b82f6", gradTo: "#2563eb" },
-  warning: { bg: "#fffbeb", color: "#d97706", border: "#fde68a", label: "Warning", emoji: "⚠️", gradFrom: "#f59e0b", gradTo: "#d97706" },
-  success: { bg: "#f0fdf4", color: "#16a34a", border: "#bbf7d0", label: "Success", emoji: "✅", gradFrom: "#22c55e", gradTo: "#16a34a" },
+  info:          { bg: "#eff6ff", color: "#2563eb", border: "#bfdbfe", label: "Info",          emoji: "ℹ️", gradFrom: "#3b82f6", gradTo: "#2563eb" },
+  warning:       { bg: "#fffbeb", color: "#d97706", border: "#fde68a", label: "Warning",       emoji: "⚠️", gradFrom: "#f59e0b", gradTo: "#d97706" },
+  success:       { bg: "#f0fdf4", color: "#16a34a", border: "#bbf7d0", label: "Success",       emoji: "✅", gradFrom: "#22c55e", gradTo: "#16a34a" },
+  monitor_alert: { bg: "#f5f3ff", color: "#7c3aed", border: "#ddd6fe", label: "Monitor Alert", emoji: "🔍", gradFrom: "#8b5cf6", gradTo: "#7c3aed" },
 };
 
 export default function AdminClient() {
@@ -74,7 +75,7 @@ export default function AdminClient() {
   const [showForm, setShowForm]             = useState(false);
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [activeTab, setActiveTab]           = useState<"active" | "inactive">("active");
-  const [mainTab, setMainTab]               = useState<"scholarships" | "studyabroad" | "notifications">("scholarships");
+  const [mainTab, setMainTab]               = useState<"scholarships" | "studyabroad" | "notifications" | "monitor">("scholarships");
   const [abroadList, setAbroadList]         = useState<AbroadScholarship[]>([]);
   const [abroadLoading, setAbroadLoading]   = useState(true);
   const [abroadForm, setAbroadForm]         = useState(EMPTY_ABROAD);
@@ -93,6 +94,22 @@ export default function AdminClient() {
   const [sendingMail, setSendingMail]       = useState(false);
   const [mailResult, setMailResult]         = useState<{ success: boolean; message: string } | null>(null);
 
+  // ── Monitor tab state ──────────────────────────────────────────────────────
+  interface MonitorChange { field: string; oldValue: string; newValue: string; suggestedAction: string; }
+  interface MonitorLog {
+    _id: string; scholarshipTitle: string; sourceUrl: string;
+    status: "changed" | "unreachable" | "ok" | "error";
+    changes: MonitorChange[]; severity: "urgent" | "high" | "medium" | "low";
+    resolved: boolean; checkedAt: string; errorMessage?: string;
+  }
+  const [monitorLogs, setMonitorLogs]           = useState<MonitorLog[]>([]);
+  const [monitorHistory, setMonitorHistory]     = useState<MonitorLog[]>([]);
+  const [monitorScanning, setMonitorScanning]   = useState(false);
+  const [monitorResult, setMonitorResult]       = useState<{ scanned: number; alerts: number; warnings: number; message: string } | null>(null);
+  const [monitorError, setMonitorError]         = useState("");
+  const [monitorHistoryTab, setMonitorHistoryTab] = useState<"alerts" | "history">("alerts");
+  const [resolvingId, setResolvingId]           = useState<string | null>(null);
+
   const loadScholarships = () => {
     setLoading(true); setError("");
     fetch("/api/scholarships").then(r => r.json()).then(d => { setScholarships(d.scholarships || []); setLoading(false); }).catch(() => { setError("Failed to load scholarships"); setLoading(false); });
@@ -105,7 +122,48 @@ export default function AdminClient() {
     fetch("/api/notifications").then(r => r.json()).then(d => setNotifications(d.notifications || [])).catch(() => {});
   };
 
-  useEffect(() => { loadScholarships(); loadAbroad(); loadNotifications(); }, []);
+  const loadMonitorAlerts = () => {
+    fetch("/api/admin/monitor-scholarships")
+      .then(r => r.json())
+      .then(d => setMonitorLogs(d.logs || []))
+      .catch(() => {});
+  };
+
+  const loadMonitorHistory = () => {
+    fetch("/api/admin/monitor-logs?all=1")
+      .then(r => r.json())
+      .then(d => setMonitorHistory(d.logs || []))
+      .catch(() => {});
+  };
+
+  async function handleRunScan() {
+    setMonitorScanning(true); setMonitorError(""); setMonitorResult(null);
+    try {
+      const res = await fetch("/api/admin/monitor-scholarships", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) { setMonitorError(data.error || "Scan failed"); }
+      else { setMonitorResult(data); loadMonitorAlerts(); loadMonitorHistory(); }
+    } catch { setMonitorError("Network error during scan"); }
+    setMonitorScanning(false);
+  }
+
+  async function handleResolveAlert(logId: string) {
+    setResolvingId(logId);
+    try {
+      const res = await fetch("/api/admin/monitor-logs", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ logId, resolved: true }),
+      });
+      if (res.ok) {
+        setMonitorLogs(prev => prev.filter(l => l._id !== logId));
+        loadMonitorHistory();
+      }
+    } catch {}
+    setResolvingId(null);
+  }
+
+  useEffect(() => { loadScholarships(); loadAbroad(); loadNotifications(); loadMonitorAlerts(); loadMonitorHistory(); }, []);
 
   function toggleCategoryFilter(cat: string) {
     if (cat === "Any") { setSelectedCategories([]); return; }
@@ -271,7 +329,7 @@ export default function AdminClient() {
               </div>
             </div>
             <div className="flex gap-3">
-              <button onClick={() => { loadScholarships(); loadAbroad(); loadNotifications(); }}
+              <button onClick={() => { loadScholarships(); loadAbroad(); loadNotifications(); loadMonitorAlerts(); loadMonitorHistory(); }}
                 className="admin-nav-btn flex items-center gap-2 text-white text-sm font-semibold px-4 py-2 rounded-lg border border-white/20 transition-all hover:border-white/40">
                 ↻ Refresh
               </button>
@@ -319,13 +377,14 @@ export default function AdminClient() {
               { key: "scholarships",  label: "India Scholarships", icon: "🎓", count: scholarships.length },
               { key: "studyabroad",   label: "Study Abroad",        icon: "✈️", count: abroadList.length },
               { key: "notifications", label: "Notifications",       icon: "🔔", count: notifications.length },
+              { key: "monitor",       label: "Monitor",             icon: "🔍", count: monitorLogs.length },
             ].map(tab => (
               <button key={tab.key} onClick={() => setMainTab(tab.key as any)}
                 className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all ${mainTab === tab.key ? "text-white shadow-md" : "text-slate-500 hover:text-slate-800 hover:bg-slate-50"}`}
-                style={mainTab === tab.key ? { background: "linear-gradient(135deg,#1e3a8a,#1d4ed8)", boxShadow: "0 2px 12px rgba(15,32,68,0.3)" } : {}}>
+                style={mainTab === tab.key ? { background: tab.key === "monitor" ? "linear-gradient(135deg,#7c3aed,#6d28d9)" : "linear-gradient(135deg,#1e3a8a,#1d4ed8)", boxShadow: "0 2px 12px rgba(15,32,68,0.3)" } : {}}>
                 <span>{tab.icon}</span>
                 <span className="hidden sm:inline">{tab.label}</span>
-                <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${mainTab === tab.key ? "bg-white/20 text-white" : "bg-slate-100 text-slate-500"}`}>{tab.count}</span>
+                <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${mainTab === tab.key ? "bg-white/20 text-white" : tab.key === "monitor" && monitorLogs.length > 0 ? "bg-red-100 text-red-600" : "bg-slate-100 text-slate-500"}`}>{tab.count}</span>
               </button>
             ))}
           </div>
@@ -865,7 +924,7 @@ export default function AdminClient() {
                   ) : (
                     <div className="space-y-3">
                       {notifications.map(n => {
-                        const cfg = notifTypeConfig[n.type];
+                        const cfg = notifTypeConfig[n.type] ?? notifTypeConfig["info"];
                         const linked = n.scholarshipId ? scholarships.find(s => s._id === n.scholarshipId) : null;
                         return (
                           <div key={n._id} className={`rounded-xl border p-4 transition-all ${n.isActive ? "" : "opacity-60"}`} style={{ background: n.isActive ? cfg.bg : "#f8fafc", borderColor: n.isActive ? cfg.border : "#e2e8f0" }}>
@@ -913,6 +972,211 @@ export default function AdminClient() {
                   )}
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* ════════════════ MONITOR ════════════════ */}
+          {mainTab === "monitor" && (
+            <div className="space-y-6">
+
+              {/* ── Header card ── */}
+              <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden" style={{ boxShadow: "0 2px 16px rgba(15,32,68,0.06)" }}>
+                <div className="px-6 py-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4" style={{ background: "linear-gradient(135deg,#4c1d95,#6d28d9)" }}>
+                  <div>
+                    <h3 className="font-display font-bold text-white text-xl">🔍 Scholarship Monitor</h3>
+                    <p className="text-violet-200 text-sm mt-1">Automatically checks official sources for deadline, amount, eligibility and status changes.</p>
+                  </div>
+                  <button
+                    onClick={handleRunScan}
+                    disabled={monitorScanning}
+                    className="flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-bold text-white border border-white/30 transition-all hover:bg-white/10 disabled:opacity-60 whitespace-nowrap"
+                    style={{ background: monitorScanning ? "rgba(255,255,255,0.1)" : "rgba(255,255,255,0.15)" }}>
+                    {monitorScanning ? (
+                      <><span className="animate-spin">⟳</span> Scanning…</>
+                    ) : (
+                      <><span>▶</span> Run Scan Now</>
+                    )}
+                  </button>
+                </div>
+
+                {/* Scan result banner */}
+                {monitorResult && (
+                  <div className="px-6 py-3 bg-emerald-50 border-b border-emerald-100 flex flex-wrap gap-4 items-center">
+                    <span className="text-emerald-700 font-semibold text-sm">✅ {monitorResult.message}</span>
+                    <div className="flex gap-3 text-xs font-bold">
+                      <span className="bg-slate-100 text-slate-600 px-2.5 py-1 rounded-full">Scanned: {monitorResult.scanned}</span>
+                      <span className="bg-red-100 text-red-600 px-2.5 py-1 rounded-full">Alerts: {monitorResult.alerts}</span>
+                      <span className="bg-amber-100 text-amber-700 px-2.5 py-1 rounded-full">Warnings: {monitorResult.warnings}</span>
+                    </div>
+                  </div>
+                )}
+                {monitorError && (
+                  <div className="px-6 py-3 bg-red-50 border-b border-red-100 flex items-center justify-between">
+                    <span className="text-red-600 text-sm font-semibold">⚠️ {monitorError}</span>
+                    <button onClick={() => setMonitorError("")} className="text-red-400 hover:text-red-600 font-bold text-lg">×</button>
+                  </div>
+                )}
+
+                {/* Sub-tabs */}
+                <div className="flex gap-1 px-6 pt-4 pb-0 border-b border-slate-100">
+                  {[
+                    { key: "alerts",  label: "Active Alerts",  count: monitorLogs.length },
+                    { key: "history", label: "History Log",    count: monitorHistory.length },
+                  ].map(t => (
+                    <button key={t.key} onClick={() => setMonitorHistoryTab(t.key as any)}
+                      className={`px-4 py-2 text-sm font-semibold rounded-t-lg border-b-2 transition-all ${monitorHistoryTab === t.key ? "border-violet-600 text-violet-700 bg-violet-50" : "border-transparent text-slate-500 hover:text-slate-700"}`}>
+                      {t.label}
+                      <span className={`ml-2 text-[11px] font-bold px-2 py-0.5 rounded-full ${monitorHistoryTab === t.key ? "bg-violet-100 text-violet-700" : "bg-slate-100 text-slate-500"}`}>{t.count}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* ── Active Alerts ── */}
+              {monitorHistoryTab === "alerts" && (
+                <div className="space-y-3">
+                  {monitorLogs.length === 0 ? (
+                    <div className="bg-white rounded-2xl border border-slate-200 p-16 text-center">
+                      <p className="text-5xl mb-3">✅</p>
+                      <p className="text-slate-700 font-semibold text-lg">No active alerts</p>
+                      <p className="text-slate-400 text-sm mt-1">All scholarships match their official sources, or no scan has been run yet.</p>
+                    </div>
+                  ) : (
+                    monitorLogs.map(log => {
+                      const severityConfig: Record<string, { bg: string; border: string; badge: string; text: string; icon: string }> = {
+                        urgent: { bg: "#fff1f2", border: "#fecdd3", badge: "bg-red-100 text-red-700",    text: "text-red-800",    icon: "🚨" },
+                        high:   { bg: "#fffbeb", border: "#fde68a", badge: "bg-amber-100 text-amber-700", text: "text-amber-800",  icon: "⚠️" },
+                        medium: { bg: "#eff6ff", border: "#bfdbfe", badge: "bg-blue-100 text-blue-700",   text: "text-blue-800",   icon: "ℹ️" },
+                        low:    { bg: "#f0fdf4", border: "#bbf7d0", badge: "bg-green-100 text-green-700", text: "text-green-800",  icon: "🔎" },
+                      };
+                      const sc = severityConfig[log.severity] || severityConfig.medium;
+
+                      return (
+                        <div key={log._id} className="bg-white rounded-2xl border overflow-hidden" style={{ borderColor: sc.border, boxShadow: "0 2px 12px rgba(15,32,68,0.06)" }}>
+                          {/* Alert header */}
+                          <div className="px-5 py-3 flex flex-wrap items-center justify-between gap-3" style={{ background: sc.bg }}>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-lg">{sc.icon}</span>
+                              <span className="font-bold text-slate-900 text-sm">{log.scholarshipTitle}</span>
+                              <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wide ${sc.badge}`}>{log.severity}</span>
+                              {log.status === "unreachable" && (
+                                <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600">⚡ Source Unreachable</span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-[11px] text-slate-400">{new Date(log.checkedAt).toLocaleString("en-IN")}</span>
+                              <button
+                                onClick={() => handleResolveAlert(log._id)}
+                                disabled={resolvingId === log._id}
+                                className="px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 transition-all disabled:opacity-50">
+                                {resolvingId === log._id ? "…" : "✓ Resolve"}
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Source URL */}
+                          <div className="px-5 py-2 bg-slate-50 border-b border-slate-100 flex items-center gap-2">
+                            <span className="text-[11px] text-slate-400 font-semibold uppercase tracking-wide">Source:</span>
+                            <a href={log.sourceUrl} target="_blank" rel="noopener noreferrer"
+                              className="text-[11px] text-violet-600 hover:underline truncate max-w-xs">{log.sourceUrl}</a>
+                          </div>
+
+                          {/* Unreachable warning */}
+                          {log.status === "unreachable" && (
+                            <div className="px-5 py-4">
+                              <p className="text-sm text-slate-600">⚡ The official source URL could not be reached. This may be a temporary outage. No data changes were detected.</p>
+                              {log.errorMessage && <p className="text-xs text-slate-400 mt-1">{log.errorMessage}</p>}
+                            </div>
+                          )}
+
+                          {/* Change rows */}
+                          {log.changes.length > 0 && (
+                            <div className="p-5 space-y-3">
+                              {log.changes.map((change, i) => (
+                                <div key={i} className="rounded-xl border border-slate-100 overflow-hidden">
+                                  <div className="px-4 py-2 bg-slate-50 flex items-center gap-2 border-b border-slate-100">
+                                    <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                                      {change.field === "deadline" ? "📅" : change.field === "amount" ? "💰" : change.field === "eligibility" ? "✅" : change.field === "status" || change.field === "isActive" ? "🔄" : "📝"}
+                                      {" "}{change.field.charAt(0).toUpperCase() + change.field.slice(1)} Changed
+                                    </span>
+                                  </div>
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-slate-100">
+                                    <div className="px-4 py-3">
+                                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Stored Value</p>
+                                      <p className="text-sm text-slate-700 font-medium">{change.oldValue}</p>
+                                    </div>
+                                    <div className="px-4 py-3 bg-amber-50">
+                                      <p className="text-[10px] font-bold text-amber-500 uppercase tracking-wider mb-1">Live Source Value</p>
+                                      <p className="text-sm text-amber-900 font-semibold">{change.newValue}</p>
+                                    </div>
+                                  </div>
+                                  <div className="px-4 py-2.5 bg-violet-50 border-t border-violet-100 flex items-start gap-2">
+                                    <span className="text-violet-500 text-sm mt-0.5">💡</span>
+                                    <p className="text-xs text-violet-800 font-semibold">{change.suggestedAction}</p>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              )}
+
+              {/* ── History Log ── */}
+              {monitorHistoryTab === "history" && (
+                <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden" style={{ boxShadow: "0 2px 16px rgba(15,32,68,0.06)" }}>
+                  <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+                    <h3 className="font-bold text-slate-800 text-base">Full History Log</h3>
+                    <button onClick={loadMonitorHistory} className="text-xs text-violet-600 font-semibold hover:underline">↻ Refresh</button>
+                  </div>
+                  {monitorHistory.length === 0 ? (
+                    <div className="p-16 text-center">
+                      <p className="text-4xl mb-3">📋</p>
+                      <p className="text-slate-400 text-sm">No history yet. Run a scan to start logging.</p>
+                    </div>
+                  ) : (
+                    <div className="divide-y divide-slate-100">
+                      {monitorHistory.map(log => {
+                        const statusConfig: Record<string, { icon: string; color: string; bg: string }> = {
+                          changed:     { icon: "⚠️", color: "text-amber-700", bg: "bg-amber-50" },
+                          unreachable: { icon: "⚡", color: "text-slate-600", bg: "bg-slate-50" },
+                          ok:          { icon: "✅", color: "text-emerald-700", bg: "bg-emerald-50" },
+                          error:       { icon: "❌", color: "text-red-600", bg: "bg-red-50" },
+                        };
+                        const sc = statusConfig[log.status] || statusConfig.ok;
+                        return (
+                          <div key={log._id} className="px-5 py-3 flex items-start gap-3 hover:bg-slate-50 transition-colors">
+                            <span className="text-base mt-0.5">{sc.icon}</span>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex flex-wrap items-center gap-2 mb-0.5">
+                                <span className="font-semibold text-slate-800 text-sm truncate">{log.scholarshipTitle}</span>
+                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${sc.bg} ${sc.color}`}>{log.status.toUpperCase()}</span>
+                                {log.resolved && <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600">RESOLVED</span>}
+                                {log.severity !== "low" && log.status === "changed" && (
+                                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-violet-50 text-violet-600">{log.severity.toUpperCase()}</span>
+                                )}
+                              </div>
+                              {log.changes.length > 0 && (
+                                <p className="text-xs text-slate-500">
+                                  Changed: {log.changes.map(c => c.field).join(", ")}
+                                </p>
+                              )}
+                              {log.errorMessage && <p className="text-xs text-slate-400">{log.errorMessage}</p>}
+                            </div>
+                            <span className="text-[11px] text-slate-400 whitespace-nowrap flex-shrink-0">
+                              {new Date(log.checkedAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+
             </div>
           )}
 
