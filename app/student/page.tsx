@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 import  StudentDashboard from "@/components/student-dashboard"
 
 export const metadata = {

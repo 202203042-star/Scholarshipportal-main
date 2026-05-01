@@ -4,7 +4,8 @@ import Link from "next/link";
 import { useLanguage } from "@/lib/language-context";
 
 export default function StudentDashboard() {
-  const { t } = useLanguage();
+  const lang = useLanguage();
+const t = lang?.t || ((x) => x);
   const [income, setIncome] = useState(0);
   const [category, setCategory] = useState("");
   const [course, setCourse] = useState("");
