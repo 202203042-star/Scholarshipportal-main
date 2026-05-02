@@ -23,15 +23,19 @@ export default async function middleware(req: NextRequest) {
   const isPublic = PUBLIC_PATHS.some((p) => pathname.startsWith(p));
   if (isPublic) return NextResponse.next();
 
-  // Check JWT token (works on Edge — no mongoose needed)
+  // Check JWT token
   const token = await getToken({
     req,
     secret: process.env.NEXTAUTH_SECRET,
+    // next-auth v5 uses a different cookie name
+    cookieName:
+      process.env.NODE_ENV === "production"
+        ? "__Secure-authjs.session-token"
+        : "authjs.session-token",
   });
 
   const isLoggedIn = !!token;
 
-  // Unauthenticated → redirect to login
   if (!isLoggedIn) {
     const loginUrl = new URL("/login", req.url);
     return NextResponse.redirect(loginUrl);

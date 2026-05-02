@@ -131,6 +131,8 @@ function LoginForm() {
       return;
     }
 
+    // Wait for session cookie to be set, then redirect
+    await new Promise(r => setTimeout(r, 500));
     window.location.href = "/";
   }
 
@@ -161,6 +163,8 @@ function LoginForm() {
       setAdminKeyLoading(false);
 
       if (data.valid) {
+        // Wait for session cookie to be set, then redirect
+        await new Promise(r => setTimeout(r, 500));
         window.location.href = "/admin";
       } else {
         setAdminKeyError(data.error || "Invalid admin key. Check Vercel env: ADMIN_SECRET_KEY");
