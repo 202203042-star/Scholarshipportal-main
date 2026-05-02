@@ -260,8 +260,27 @@ function lvlBadge(l: string) {
 }
 
 export default function ScholarshipPage() {
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
   const router = useRouter();
+
+  // Redirect to login if not authenticated
+  useEffect(() => {
+    if (status === "unauthenticated") {
+      router.replace("/login");
+    }
+  }, [status, router]);
+
+  // Show nothing while checking session
+  if (status === "loading" || status === "unauthenticated") {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-indigo-50">
+        <div className="text-center">
+          <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-white text-2xl mx-auto mb-4" style={{ background: "linear-gradient(135deg,#1d4ed8,#4f46e5)" }}>🎓</div>
+          <p className="text-slate-500 text-sm font-medium">Loading...</p>
+        </div>
+      </div>
+    );
+  }
   const [lang, setLang] = useState<Lang>("en");
   const t = T[lang];
   const [SCHOLARSHIPS, setScholarships] = useState<Scholarship[]>([]);
