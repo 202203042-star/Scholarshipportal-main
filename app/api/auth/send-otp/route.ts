@@ -3,8 +3,13 @@ import nodemailer from "nodemailer";
 import connectDB from "@/lib/mongodb";
 import User from "@/models/User";
 
-const otpStore = new Map<string, { otp: string; expires: number }>();
+// ── Nodemailer transporter ────────────────────────────────────
+const transporter = nodemailer.createTransport({
+  service: "gmail",
+  auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS },
+});
 
+// ── POST: generate OTP, store in DB, send email ───────────────
 export async function POST(req: NextRequest) {
   try {
     const { email } = await req.json();
@@ -14,14 +19,18 @@ export async function POST(req: NextRequest) {
     const user = await User.findOne({ email });
     if (!user) return NextResponse.json({ error: "No account found with this email" }, { status: 404 });
 
+    // Generate 6-digit OTP
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    otpStore.set(email, { otp, expires: Date.now() + 5 * 60 * 1000 });
+    const otpExpires = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
 
-    const transporter = nodemailer.createTransport({
-      service: "gmail",
-      auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS },
-    });
+    // Store OTP in the user document
+    await User.findOneAndUpdate(
+      { email },
+      { otp, otpExpires },
+      { new: true }
+    );
 
+    // Send OTP email
     await transporter.sendMail({
       from: `"ScholarHub" <${process.env.EMAIL_USER}>`,
       to: email,
@@ -53,18 +62,39 @@ export async function POST(req: NextRequest) {
   }
 }
 
+// ── GET: verify OTP from DB ───────────────────────────────────
 export async function GET(req: NextRequest) {
-  const { searchParams } = new URL(req.url);
-  const email = searchParams.get("email");
-  const otp = searchParams.get("otp");
+  try {
+    const { searchParams } = new URL(req.url);
+    const email = searchParams.get("email");
+    const otp   = searchParams.get("otp");
 
-  if (!email || !otp) return NextResponse.json({ valid: false, error: "Email and OTP required" });
+    if (!email || !otp) {
+      return NextResponse.json({ valid: false, error: "Email and OTP required" });
+    }
 
-  const stored = otpStore.get(email);
-  if (!stored) return NextResponse.json({ valid: false, error: "OTP has expired" });
-  if (Date.now() > stored.expires) { otpStore.delete(email); return NextResponse.json({ valid: false, error: "OTP has expired" }); }
-  if (stored.otp !== otp) return NextResponse.json({ valid: false, error: "Invalid OTP" });
+    await connectDB();
+    const user = await User.findOne({ email });
 
-  otpStore.delete(email);
-  return NextResponse.json({ valid: true });
+    if (!user || !user.otp || !user.otpExpires) {
+      return NextResponse.json({ valid: false, error: "OTP has expired. Please request a new one." });
+    }
+
+    if (new Date() > new Date(user.otpExpires)) {
+      await User.findOneAndUpdate({ email }, { $unset: { otp: 1, otpExpires: 1 } });
+      return NextResponse.json({ valid: false, error: "OTP has expired. Please request a new one." });
+    }
+
+    if (user.otp !== otp) {
+      return NextResponse.json({ valid: false, error: "Incorrect OTP. Please try again." });
+    }
+
+    // OTP correct — clear it from DB
+    await User.findOneAndUpdate({ email }, { $unset: { otp: 1, otpExpires: 1 } });
+
+    return NextResponse.json({ valid: true });
+  } catch (error: any) {
+    console.error("OTP verify error:", error);
+    return NextResponse.json({ valid: false, error: "Server error" }, { status: 500 });
+  }
 }

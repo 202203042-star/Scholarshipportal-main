@@ -1,13 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import { signIn } from "next-auth/react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { GraduationCap, Mail, Lock, Eye, EyeOff, Loader2, Shield, KeyRound } from "lucide-react";
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const justRegistered = searchParams.get("registered") === "1";
   const [role, setRole] = useState<"student" | "admin">("student");
   const [email, setEmail] = useState("");
   const [username, setUsername] = useState("");
@@ -45,7 +47,7 @@ export default function LoginPage() {
     setError("");
 
     if (role === "admin") {
-      // Step 1: Verify admin username + password
+      // Admin: signIn immediately (admin has separate key step after)
       const loginEmail = `admin_${username}@scholarhub.admin`;
       const res = await signIn("credentials", {
         email: loginEmail,
@@ -64,17 +66,21 @@ export default function LoginPage() {
       return;
     }
 
-    // Student — verify email+password
-    const res = await signIn("credentials", { email, password, redirect: false });
-    setLoading(false);
+    // Student — verify credentials WITHOUT creating a session
+    const credRes = await fetch("/api/auth/verify-credentials", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    });
+    const credData = await credRes.json();
 
-    if (res?.error) {
-      setError("Email or password is incorrect. Please register first.");
+    if (!credData.valid) {
+      setLoading(false);
+      setError(credData.error || "Email or password is incorrect. Please register first.");
       return;
     }
 
-    // Correct — send OTP
-    setLoading(true);
+    // Credentials correct — now send OTP (still no session yet)
     const otpRes = await fetch("/api/auth/send-otp", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -82,19 +88,47 @@ export default function LoginPage() {
     });
     setLoading(false);
 
-    if (otpRes.ok) { setStep("otp"); startResendTimer(); }
-    else { const data = await otpRes.json(); setError(data.error || "OTP could not be sent"); }
+    if (otpRes.ok) {
+      setStep("otp");
+      startResendTimer();
+    } else {
+      const data = await otpRes.json();
+      setError(data.error || "OTP could not be sent");
+    }
   }
 
   async function handleOtpVerify(e: React.FormEvent) {
     e.preventDefault();
     setOtpLoading(true);
     setOtpError("");
+
+    // Verify OTP first
     const res = await fetch(`/api/auth/send-otp?email=${encodeURIComponent(email)}&otp=${otp}`);
     const data = await res.json();
+
+    if (!data.valid) {
+      setOtpLoading(false);
+      setOtpError(data.error || "Incorrect OTP. Please try again.");
+      setOtp("");
+      return;
+    }
+
+    // OTP correct — NOW create the session
+    const signInRes = await signIn("credentials", {
+      email,
+      password,
+      redirect: false,
+    });
+
     setOtpLoading(false);
-    if (data.valid) { router.push("/"); router.refresh(); }
-    else { setOtpError(data.error || "Incorrect OTP. Please try again."); setOtp(""); }
+
+    if (signInRes?.error) {
+      setOtpError("Login failed. Please try again.");
+      return;
+    }
+
+    router.push("/");
+    router.refresh();
   }
 
   async function handleResendOtp() {
@@ -322,6 +356,15 @@ export default function LoginPage() {
         </div>
 
         <div className="bg-white rounded-3xl shadow-xl border border-gray-100 p-8">
+
+          {/* Registration success banner */}
+          {justRegistered && (
+            <div className="flex items-start gap-3 bg-green-50 border border-green-200 text-green-700 rounded-2xl px-4 py-3 text-sm mb-5">
+              <span className="mt-0.5 flex-shrink-0">✅</span>
+              <p><strong>Account created successfully!</strong> Please login with your email and password.</p>
+            </div>
+          )}
+
           <h2 className="text-2xl font-bold text-gray-900 mb-1">
             {role === "student" ? "Welcome back!" : "Admin Portal"}
           </h2>
@@ -412,5 +455,13 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginForm />
+    </Suspense>
   );
 }

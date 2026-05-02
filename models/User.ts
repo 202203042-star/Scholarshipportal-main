@@ -10,13 +10,15 @@ export interface IUser extends Document {
   address?: string;
   dateOfBirth?: string;
   gender?: string;
-  category?: string; // SC/ST/OBC/General
+  category?: string;
   income?: number;
   aadharNumber?: string;
   bankAccount?: string;
   ifscCode?: string;
   documents?: string[];
   appliedScholarships?: mongoose.Types.ObjectId[];
+  otp?: string;
+  otpExpires?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -39,6 +41,8 @@ const UserSchema = new Schema<IUser>(
     ifscCode: { type: String },
     documents: [{ type: String }],
     appliedScholarships: [{ type: Schema.Types.ObjectId, ref: "Scholarship" }],
+    otp: { type: String, default: null },
+    otpExpires: { type: Date, default: null },
   },
   { timestamps: true }
 );

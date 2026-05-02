@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { signIn } from "next-auth/react";
 import {
   GraduationCap, Mail, Lock, Eye, EyeOff,
   User, CheckCircle2, Loader2, AlertCircle,
@@ -63,16 +62,7 @@ export default function RegisterPage() {
         return;
       }
 
-      const loginRes = await signIn("credentials", {
-        email: form.email,
-        password: form.password,
-        redirect: false,
-      });
-      if (loginRes?.error) {
-        router.push("/login");
-      } else {
-        router.push("/");
-      }
+      router.push("/login?registered=1");
     } catch {
       setError("Server error. Please try again.");
       setLoading(false);
