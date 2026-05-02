@@ -56,8 +56,12 @@ function LoginForm() {
       });
       setLoading(false);
 
-      if (res?.error) {
-        setError("Username or password is incorrect");
+      if (!res) {
+        setError("No response from server. Please try again.");
+        return;
+      }
+      if (res.error) {
+        setError(`Login failed: ${res.error}. Check username/password.`);
         return;
       }
 
@@ -127,8 +131,7 @@ function LoginForm() {
       return;
     }
 
-    router.push("/");
-    router.refresh();
+    window.location.href = "/";
   }
 
   async function handleResendOtp() {
@@ -158,10 +161,9 @@ function LoginForm() {
       setAdminKeyLoading(false);
 
       if (data.valid) {
-        router.push("/admin");
-        router.refresh();
+        window.location.href = "/admin";
       } else {
-        setAdminKeyError(data.error || "Invalid admin key. Please try again.");
+        setAdminKeyError(data.error || "Invalid admin key. Check Vercel env: ADMIN_SECRET_KEY");
         setAdminKey("");
       }
     } catch {
