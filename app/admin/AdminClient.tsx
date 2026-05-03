@@ -10,12 +10,19 @@ interface Scholarship {
 interface AbroadScholarship {
   _id?: string; name: string; provider: string; country: string; amount: string;
   deadline: string; eligibility: string; level: string; fields: string; bond: string;
-  applyLink: string; documents: string; tips: string; isActive: boolean;
+  applyLink: string; documents: string; tips: string;
+  visaProcess: string; visaDocuments: string;
+  isActive: boolean;
 }
 interface Notification {
-  _id: string; title: string; message: string; type: "info" | "warning" | "success";
+  _id: string; title: string; message: string; type: "info" | "warning" | "success" | "monitor_alert";
   isActive: boolean; createdAt: string; scholarshipId?: string;
   targetCategory?: string; personalEmail?: string;
+}
+
+interface ContactQuery {
+  _id: string; name: string; email: string; message: string;
+  isRead: boolean; createdAt: string;
 }
 
 const EMPTY_FORM = {
@@ -26,7 +33,9 @@ const EMPTY_FORM = {
 const EMPTY_ABROAD: Omit<AbroadScholarship, "_id"> = {
   name: "", provider: "", country: "usa", amount: "", deadline: "",
   eligibility: "", level: "Master", fields: "", bond: "No bond",
-  applyLink: "", documents: "", tips: "", isActive: true,
+  applyLink: "", documents: "", tips: "",
+  visaProcess: "", visaDocuments: "",
+  isActive: true,
 };
 const EMPTY_NOTIF = { title: "", message: "", type: "info" as const, scholarshipId: "", targetCategory: "all", personalEmail: "" };
 const NOTIF_CATEGORIES = ["General", "OBC", "SC", "ST", "Minority", "EWS", "Girls"];
@@ -75,7 +84,7 @@ export default function AdminClient() {
   const [showForm, setShowForm]             = useState(false);
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [activeTab, setActiveTab]           = useState<"active" | "inactive">("active");
-  const [mainTab, setMainTab]               = useState<"scholarships" | "studyabroad" | "notifications" | "monitor">("scholarships");
+  const [mainTab, setMainTab]               = useState<"scholarships" | "studyabroad" | "notifications" | "monitor" | "contacts">("scholarships");
   const [abroadList, setAbroadList]         = useState<AbroadScholarship[]>([]);
   const [abroadLoading, setAbroadLoading]   = useState(true);
   const [abroadForm, setAbroadForm]         = useState(EMPTY_ABROAD);
@@ -94,10 +103,20 @@ export default function AdminClient() {
   const [sendingMail, setSendingMail]       = useState(false);
   const [mailResult, setMailResult]         = useState<{ success: boolean; message: string } | null>(null);
 
+  // ── Contact Queries state ──────────────────────────────────────────────────
+  const [contacts, setContacts]             = useState<ContactQuery[]>([]);
+  const [contactsLoading, setContactsLoading] = useState(false);
+  const [deletingContactId, setDeletingContactId] = useState<string | null>(null);
+  const [contactFilter, setContactFilter]   = useState<"all" | "unread" | "read">("all");
+  const [replyingTo, setReplyingTo]         = useState<ContactQuery | null>(null);
+  const [replyMessage, setReplyMessage]     = useState("");
+  const [replySending, setReplySending]     = useState(false);
+  const [replyResult, setReplyResult]       = useState<{ success: boolean; message: string } | null>(null);
+
   // ── Monitor tab state ──────────────────────────────────────────────────────
   interface MonitorChange { field: string; oldValue: string; newValue: string; suggestedAction: string; }
   interface MonitorLog {
-    _id: string; scholarshipTitle: string; sourceUrl: string;
+    _id: string; scholarshipId: string; scholarshipTitle: string; sourceUrl: string;
     status: "changed" | "unreachable" | "ok" | "error";
     changes: MonitorChange[]; severity: "urgent" | "high" | "medium" | "low";
     resolved: boolean; checkedAt: string; errorMessage?: string;
@@ -109,6 +128,9 @@ export default function AdminClient() {
   const [monitorError, setMonitorError]         = useState("");
   const [monitorHistoryTab, setMonitorHistoryTab] = useState<"alerts" | "history">("alerts");
   const [resolvingId, setResolvingId]           = useState<string | null>(null);
+  const [applyingFixId, setApplyingFixId]       = useState<string | null>(null);
+  const [monitorSearch, setMonitorSearch]       = useState("");
+  const [monitorSeverityFilter, setMonitorSeverityFilter] = useState<"all" | "urgent" | "high" | "medium" | "low">("all");
 
   const loadScholarships = () => {
     setLoading(true); setError("");
@@ -130,11 +152,66 @@ export default function AdminClient() {
   };
 
   const loadMonitorHistory = () => {
+    // History = all logs except active unresolved "changed" ones
     fetch("/api/admin/monitor-logs?all=1")
       .then(r => r.json())
       .then(d => setMonitorHistory(d.logs || []))
       .catch(() => {});
   };
+
+  const loadContacts = () => {
+    setContactsLoading(true);
+    fetch("/api/contact")
+      .then(r => r.json())
+      .then(d => { setContacts(d.contacts || []); setContactsLoading(false); })
+      .catch(() => setContactsLoading(false));
+  };
+
+  async function handleMarkContactRead(id: string, isRead: boolean) {
+    try {
+      await fetch("/api/contact", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, isRead }) });
+      setContacts(prev => prev.map(c => c._id === id ? { ...c, isRead } : c));
+    } catch {}
+  }
+
+  async function handleDeleteContact(id: string) {
+    if (!confirm("Delete this query?")) return;
+    setDeletingContactId(id);
+    try {
+      await fetch("/api/contact", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) });
+      setContacts(prev => prev.filter(c => c._id !== id));
+    } catch {}
+    setDeletingContactId(null);
+  }
+
+  async function handleSendReply() {
+    if (!replyingTo || !replyMessage.trim()) return;
+    setReplySending(true);
+    try {
+      const res = await fetch("/api/contact/reply", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          to: replyingTo.email,
+          name: replyingTo.name,
+          originalMessage: replyingTo.message,
+          reply: replyMessage,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setReplyResult({ success: true, message: "Reply sent successfully!" });
+        // Mark as read
+        handleMarkContactRead(replyingTo._id, true);
+        setTimeout(() => { setReplyingTo(null); setReplyMessage(""); setReplyResult(null); }, 2000);
+      } else {
+        setReplyResult({ success: false, message: data.error || "Failed to send reply" });
+      }
+    } catch {
+      setReplyResult({ success: false, message: "Network error" });
+    }
+    setReplySending(false);
+  }
 
   async function handleRunScan() {
     setMonitorScanning(true); setMonitorError(""); setMonitorResult(null);
@@ -163,7 +240,71 @@ export default function AdminClient() {
     setResolvingId(null);
   }
 
-  useEffect(() => { loadScholarships(); loadAbroad(); loadNotifications(); loadMonitorAlerts(); loadMonitorHistory(); }, []);
+  // Apply all suggested fixes from a monitor alert automatically
+  async function handleApplyMonitorFix(log: MonitorLog) {
+    if (!log.scholarshipId || log.changes.length === 0) return;
+    setApplyingFixId(log._id);
+
+    try {
+      // Build update payload from detected changes
+      const payload: Record<string, any> = {};
+      for (const change of log.changes) {
+        switch (change.field) {
+          case "deadline": {
+            // Parse the new date value
+            const d = new Date(change.newValue);
+            if (!isNaN(d.getTime())) payload.deadline = d.toISOString();
+            break;
+          }
+          case "amount": {
+            const num = parseInt(change.newValue.replace(/[^\d]/g, ""), 10);
+            if (!isNaN(num)) payload.amount = num;
+            break;
+          }
+          case "status":
+          case "isActive":
+            payload.isActive = change.newValue.toLowerCase() === "active";
+            break;
+          case "eligibility":
+            payload.eligibility = change.newValue;
+            break;
+          default:
+            break;
+        }
+      }
+
+      if (Object.keys(payload).length === 0) {
+        setApplyingFixId(null);
+        return;
+      }
+
+      const res = await fetch(`/api/scholarships/${log.scholarshipId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (res.ok) {
+        // Mark alert as resolved
+        await fetch("/api/admin/monitor-logs", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ logId: log._id, resolved: true }),
+        });
+        setMonitorLogs(prev => prev.filter(l => l._id !== log._id));
+        loadScholarships();
+        loadMonitorHistory();
+      } else {
+        const data = await res.json();
+        setMonitorError(data.error || "Failed to apply fix");
+      }
+    } catch {
+      setMonitorError("Network error while applying fix");
+    }
+    setApplyingFixId(null);
+  }
+
+  useEffect(() => { loadScholarships(); loadAbroad(); loadNotifications(); loadMonitorAlerts(); loadMonitorHistory(); loadContacts(); }, []);
 
   function toggleCategoryFilter(cat: string) {
     if (cat === "Any") { setSelectedCategories([]); return; }
@@ -229,7 +370,12 @@ export default function AdminClient() {
   }
 
   function handleAbroadEdit(s: AbroadScholarship) {
-    setAbroadForm({ ...s, documents: Array.isArray(s.documents) ? (s.documents as any[]).join(", ") : s.documents || "" });
+    setAbroadForm({
+      ...s,
+      documents: Array.isArray(s.documents) ? (s.documents as any[]).join(", ") : s.documents || "",
+      visaProcess: s.visaProcess || "",
+      visaDocuments: s.visaDocuments || "",
+    });
     setAbroadEditingId(s._id!); setShowAbroadForm(true); window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
@@ -329,7 +475,7 @@ export default function AdminClient() {
               </div>
             </div>
             <div className="flex gap-3">
-              <button onClick={() => { loadScholarships(); loadAbroad(); loadNotifications(); loadMonitorAlerts(); loadMonitorHistory(); }}
+              <button onClick={() => { loadScholarships(); loadAbroad(); loadNotifications(); loadMonitorAlerts(); loadMonitorHistory(); loadContacts(); }}
                 className="admin-nav-btn flex items-center gap-2 text-white text-sm font-semibold px-4 py-2 rounded-lg border border-white/20 transition-all hover:border-white/40">
                 ↻ Refresh
               </button>
@@ -376,15 +522,16 @@ export default function AdminClient() {
             {[
               { key: "scholarships",  label: "India Scholarships", icon: "🎓", count: scholarships.length },
               { key: "studyabroad",   label: "Study Abroad",        icon: "✈️", count: abroadList.length },
-              { key: "notifications", label: "Notifications",       icon: "🔔", count: notifications.length },
               { key: "monitor",       label: "Monitor",             icon: "🔍", count: monitorLogs.length },
+              { key: "notifications", label: "Notifications",       icon: "🔔", count: notifications.length },
+              { key: "contacts",      label: "Queries",             icon: "💬", count: contacts.filter(c => !c.isRead).length },
             ].map(tab => (
               <button key={tab.key} onClick={() => setMainTab(tab.key as any)}
                 className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all ${mainTab === tab.key ? "text-white shadow-md" : "text-slate-500 hover:text-slate-800 hover:bg-slate-50"}`}
-                style={mainTab === tab.key ? { background: tab.key === "monitor" ? "linear-gradient(135deg,#7c3aed,#6d28d9)" : "linear-gradient(135deg,#1e3a8a,#1d4ed8)", boxShadow: "0 2px 12px rgba(15,32,68,0.3)" } : {}}>
+                style={mainTab === tab.key ? { background: tab.key === "monitor" ? "linear-gradient(135deg,#7c3aed,#6d28d9)" : tab.key === "contacts" ? "linear-gradient(135deg,#0891b2,#0e7490)" : "linear-gradient(135deg,#1e3a8a,#1d4ed8)", boxShadow: "0 2px 12px rgba(15,32,68,0.3)" } : {}}>
                 <span>{tab.icon}</span>
                 <span className="hidden sm:inline">{tab.label}</span>
-                <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${mainTab === tab.key ? "bg-white/20 text-white" : tab.key === "monitor" && monitorLogs.length > 0 ? "bg-red-100 text-red-600" : "bg-slate-100 text-slate-500"}`}>{tab.count}</span>
+                <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${mainTab === tab.key ? "bg-white/20 text-white" : tab.key === "monitor" && monitorLogs.length > 0 ? "bg-red-100 text-red-600" : tab.key === "contacts" && contacts.filter(c => !c.isRead).length > 0 ? "bg-red-100 text-red-600" : "bg-slate-100 text-slate-500"}`}>{tab.count}</span>
               </button>
             ))}
           </div>
@@ -540,18 +687,7 @@ export default function AdminClient() {
                   })}
                 </div>
 
-                {/* Active / Inactive Tabs */}
-                <div className="flex border-b border-slate-100">
-                  {[{ key: "active", label: `Active`, count: filteredActive.length, color: "#059669" }, { key: "inactive", label: `Inactive`, count: filteredInactive.length, color: "#dc2626" }].map(tab => (
-                    <button key={tab.key} onClick={() => setActiveTab(tab.key as any)}
-                      className={`flex-1 py-3 text-sm font-bold transition-all ${activeTab === tab.key ? "bg-white" : "bg-slate-50 text-slate-400 hover:text-slate-600"}`}
-                      style={{ color: activeTab === tab.key ? tab.color : undefined, borderBottom: activeTab === tab.key ? `2px solid ${tab.color}` : "2px solid transparent" }}>
-                      {tab.label} <span className="ml-1 text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: activeTab === tab.key ? (tab.key === "active" ? "#d1fae5" : "#fee2e2") : "#f1f5f9", color: tab.color }}>{tab.count}</span>
-                    </button>
-                  ))}
-                </div>
-
-                {/* List */}
+                {/* Active / Inactive — 2 separate column cards */}
                 <div className="p-5">
                   {loading ? (
                     <div className="text-center py-16">
@@ -559,13 +695,40 @@ export default function AdminClient() {
                       <p className="text-slate-400 text-sm">Loading...</p>
                     </div>
                   ) : (
-                    <div className="space-y-2.5">
-                      {(activeTab === "active" ? filteredActive : filteredInactive).length === 0 ? (
-                        <div className="text-center py-16">
-                          <p className="text-4xl mb-3">🎓</p>
-                          <p className="text-slate-400 text-sm">No scholarships found</p>
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+
+                      {/* Active Column */}
+                      <div className="bg-white rounded-2xl border border-emerald-200 overflow-hidden" style={{ boxShadow: "0 2px 12px rgba(5,150,105,0.08)" }}>
+                        <div className="flex items-center gap-2 px-4 py-3 bg-emerald-50 border-b border-emerald-100">
+                          <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block"></span>
+                          <h4 className="font-bold text-emerald-700 text-sm uppercase tracking-wide flex-1">Active</h4>
+                          <span className="text-xs font-bold bg-emerald-100 text-emerald-700 px-2.5 py-0.5 rounded-full">{filteredActive.length}</span>
                         </div>
-                      ) : (activeTab === "active" ? filteredActive : filteredInactive).map(s => <ScholarshipCard key={s._id} s={s} />)}
+                        <div className="p-3 space-y-2 max-h-[600px] overflow-y-auto">
+                          {filteredActive.length === 0 ? (
+                            <div className="text-center py-10">
+                              <p className="text-slate-400 text-sm">No active scholarships</p>
+                            </div>
+                          ) : filteredActive.map(s => <ScholarshipCard key={s._id} s={s} />)}
+                        </div>
+                      </div>
+
+                      {/* Inactive Column */}
+                      <div className="bg-white rounded-2xl border border-red-200 overflow-hidden" style={{ boxShadow: "0 2px 12px rgba(220,38,38,0.08)" }}>
+                        <div className="flex items-center gap-2 px-4 py-3 bg-red-50 border-b border-red-100">
+                          <span className="w-2.5 h-2.5 rounded-full bg-red-400 inline-block"></span>
+                          <h4 className="font-bold text-red-600 text-sm uppercase tracking-wide flex-1">Inactive</h4>
+                          <span className="text-xs font-bold bg-red-100 text-red-600 px-2.5 py-0.5 rounded-full">{filteredInactive.length}</span>
+                        </div>
+                        <div className="p-3 space-y-2 max-h-[600px] overflow-y-auto">
+                          {filteredInactive.length === 0 ? (
+                            <div className="text-center py-10">
+                              <p className="text-slate-400 text-sm">No inactive scholarships</p>
+                            </div>
+                          ) : filteredInactive.map(s => <ScholarshipCard key={s._id} s={s} />)}
+                        </div>
+                      </div>
+
                     </div>
                   )}
                 </div>
@@ -666,6 +829,19 @@ export default function AdminClient() {
                       <div className="md:col-span-2">
                         <label className={lbl}>Pro Tip</label>
                         <textarea rows={2} value={abroadForm.tips} onChange={e => setAbroadForm({ ...abroadForm, tips: e.target.value })} placeholder="Tips for applicants..." className={inp + " resize-y"} />
+                      </div>
+
+                      {/* ── Visa Section ── */}
+                      <div className="md:col-span-2 pt-4 border-t border-slate-100">
+                        <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">🛂 Visa Information</p>
+                      </div>
+                      <div className="md:col-span-2">
+                        <label className={lbl}>Visa Process</label>
+                        <textarea rows={3} value={abroadForm.visaProcess} onChange={e => setAbroadForm({ ...abroadForm, visaProcess: e.target.value })} placeholder="e.g. Apply for Student Visa (F-1) after receiving I-20 from university. Book appointment at US Embassy..." className={inp + " resize-y"} />
+                      </div>
+                      <div className="md:col-span-2">
+                        <label className={lbl}>Visa Documents Required</label>
+                        <textarea rows={3} value={abroadForm.visaDocuments} onChange={e => setAbroadForm({ ...abroadForm, visaDocuments: e.target.value })} placeholder="e.g. Valid Passport, DS-160 form, I-20, SEVIS fee receipt, Bank statements, Admission letter..." className={inp + " resize-y"} />
                       </div>
                     </div>
                     <div className="flex gap-3 mt-6 pt-5 border-t border-slate-100">
@@ -1035,14 +1211,39 @@ export default function AdminClient() {
               {/* ── Active Alerts ── */}
               {monitorHistoryTab === "alerts" && (
                 <div className="space-y-3">
-                  {monitorLogs.length === 0 ? (
+                  {/* Search + Filter bar */}
+                  <div className="bg-white rounded-2xl border border-slate-200 p-4 flex flex-wrap gap-3 items-center">
+                    <input
+                      value={monitorSearch}
+                      onChange={e => setMonitorSearch(e.target.value)}
+                      placeholder="Search scholarship name..."
+                      className="flex-1 min-w-[180px] border border-slate-200 rounded-xl px-3.5 py-2 text-sm outline-none focus:ring-2 focus:ring-violet-400 bg-slate-50"
+                    />
+                    <div className="flex gap-2 flex-wrap">
+                      {(["all", "urgent", "high", "medium", "low"] as const).map(s => (
+                        <button key={s} onClick={() => setMonitorSeverityFilter(s)}
+                          className={`px-3 py-1.5 rounded-full text-xs font-bold border transition-all ${monitorSeverityFilter === s ? "text-white border-transparent" : "text-slate-500 border-slate-200 bg-white"}`}
+                          style={monitorSeverityFilter === s ? { background: s === "urgent" ? "#dc2626" : s === "high" ? "#d97706" : s === "medium" ? "#2563eb" : s === "low" ? "#059669" : "#7c3aed" } : {}}>
+                          {s === "all" ? "All" : s.charAt(0).toUpperCase() + s.slice(1)}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {(() => {
+                    const filtered = monitorLogs.filter(log => {
+                      const matchSearch = !monitorSearch || log.scholarshipTitle.toLowerCase().includes(monitorSearch.toLowerCase());
+                      const matchSeverity = monitorSeverityFilter === "all" || log.severity === monitorSeverityFilter;
+                      return matchSearch && matchSeverity;
+                    });
+                    return filtered.length === 0 ? (
                     <div className="bg-white rounded-2xl border border-slate-200 p-16 text-center">
                       <p className="text-5xl mb-3">✅</p>
                       <p className="text-slate-700 font-semibold text-lg">No active alerts</p>
                       <p className="text-slate-400 text-sm mt-1">All scholarships match their official sources, or no scan has been run yet.</p>
                     </div>
                   ) : (
-                    monitorLogs.map(log => {
+                    filtered.map(log => {
                       const severityConfig: Record<string, { bg: string; border: string; badge: string; text: string; icon: string }> = {
                         urgent: { bg: "#fff1f2", border: "#fecdd3", badge: "bg-red-100 text-red-700",    text: "text-red-800",    icon: "🚨" },
                         high:   { bg: "#fffbeb", border: "#fde68a", badge: "bg-amber-100 text-amber-700", text: "text-amber-800",  icon: "⚠️" },
@@ -1065,6 +1266,14 @@ export default function AdminClient() {
                             </div>
                             <div className="flex items-center gap-2">
                               <span className="text-[11px] text-slate-400">{new Date(log.checkedAt).toLocaleString("en-IN")}</span>
+                              {log.changes.length > 0 && (
+                                <button
+                                  onClick={() => handleApplyMonitorFix(log)}
+                                  disabled={applyingFixId === log._id}
+                                  className="px-3 py-1.5 rounded-lg text-xs font-bold bg-blue-600 text-white hover:bg-blue-700 transition-all disabled:opacity-50">
+                                  {applyingFixId === log._id ? "Applying…" : "Apply Fix"}
+                                </button>
+                              )}
                               <button
                                 onClick={() => handleResolveAlert(log._id)}
                                 disabled={resolvingId === log._id}
@@ -1121,7 +1330,8 @@ export default function AdminClient() {
                         </div>
                       );
                     })
-                  )}
+                  );
+                  })()}
                 </div>
               )}
 
@@ -1177,6 +1387,131 @@ export default function AdminClient() {
                 </div>
               )}
 
+            </div>
+          )}
+
+          {/* ════════════════ CONTACT QUERIES ════════════════ */}
+          {mainTab === "contacts" && (
+            <div className="space-y-4">
+
+              {/* ── Reply Modal ── */}
+              {replyingTo && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+                  <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-lg p-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="font-bold text-slate-900 text-lg">📧 Reply to {replyingTo.name}</h3>
+                      <button onClick={() => { setReplyingTo(null); setReplyMessage(""); setReplyResult(null); }}
+                        className="text-slate-400 hover:text-slate-600 text-xl font-bold">×</button>
+                    </div>
+
+                    {/* Original message */}
+                    <div className="bg-slate-50 rounded-xl p-3 mb-4 border border-slate-100">
+                      <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wide mb-1">Original Message</p>
+                      <p className="text-sm text-slate-600">{replyingTo.message}</p>
+                      <p className="text-[11px] text-slate-400 mt-1">From: {replyingTo.email}</p>
+                    </div>
+
+                    {/* Reply input */}
+                    <div className="mb-4">
+                      <label className="block text-sm font-semibold text-slate-700 mb-1.5">Your Reply</label>
+                      <textarea
+                        rows={5}
+                        value={replyMessage}
+                        onChange={e => setReplyMessage(e.target.value)}
+                        placeholder="Type your reply here..."
+                        className="w-full border border-slate-200 rounded-xl px-3.5 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-400 resize-none"
+                      />
+                    </div>
+
+                    {replyResult && (
+                      <div className={`mb-3 px-4 py-2.5 rounded-xl text-sm font-semibold ${replyResult.success ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-red-50 text-red-600 border border-red-200"}`}>
+                        {replyResult.success ? "✅" : "❌"} {replyResult.message}
+                      </div>
+                    )}
+
+                    <div className="flex gap-3">
+                      <button onClick={handleSendReply} disabled={replySending || !replyMessage.trim()}
+                        className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white transition-all hover:opacity-90 disabled:opacity-50"
+                        style={{ background: "linear-gradient(135deg,#1d4ed8,#4f46e5)" }}>
+                        {replySending ? "Sending..." : "Send Reply"}
+                      </button>
+                      <button onClick={() => { setReplyingTo(null); setReplyMessage(""); setReplyResult(null); }}
+                        className="px-5 py-2.5 rounded-xl text-sm font-semibold text-slate-600 border border-slate-200 hover:bg-slate-50">
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+              <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden" style={{ boxShadow: "0 2px 16px rgba(15,32,68,0.06)" }}>
+                <div className="px-6 py-4 flex flex-wrap items-center justify-between gap-3" style={{ background: "linear-gradient(135deg,#0891b2,#0e7490)" }}>
+                  <div>
+                    <h3 className="font-display font-bold text-white text-xl">💬 Contact Queries</h3>
+                    <p className="text-cyan-100 text-sm mt-0.5">Messages submitted by students via the Contact page</p>
+                  </div>
+                  <div className="flex gap-2">
+                    {(["all", "unread", "read"] as const).map(f => (
+                      <button key={f} onClick={() => setContactFilter(f)}
+                        className={`px-3 py-1.5 rounded-full text-xs font-bold border transition-all ${contactFilter === f ? "bg-white text-cyan-700 border-white" : "text-white border-white/30 hover:bg-white/10"}`}>
+                        {f === "all" ? `All (${contacts.length})` : f === "unread" ? `Unread (${contacts.filter(c => !c.isRead).length})` : `Read (${contacts.filter(c => c.isRead).length})`}
+                      </button>
+                    ))}
+                    <button onClick={loadContacts} className="px-3 py-1.5 rounded-full text-xs font-bold text-white border border-white/30 hover:bg-white/10">↻</button>
+                  </div>
+                </div>
+
+                <div className="p-5">
+                  {contactsLoading ? (
+                    <div className="text-center py-16">
+                      <div className="inline-block w-8 h-8 border-4 border-cyan-200 border-t-cyan-600 rounded-full animate-spin mb-3"></div>
+                      <p className="text-slate-400 text-sm">Loading queries...</p>
+                    </div>
+                  ) : (() => {
+                    const filtered = contacts.filter(c =>
+                      contactFilter === "all" ? true : contactFilter === "unread" ? !c.isRead : c.isRead
+                    );
+                    return filtered.length === 0 ? (
+                      <div className="text-center py-16">
+                        <p className="text-5xl mb-3">💬</p>
+                        <p className="text-slate-500 font-semibold">No queries found</p>
+                        <p className="text-slate-400 text-sm mt-1">Student messages will appear here</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {filtered.map(c => (
+                          <div key={c._id} className={`rounded-2xl border p-5 transition-all ${!c.isRead ? "bg-cyan-50 border-cyan-200" : "bg-white border-slate-200"}`}>
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex-1 min-w-0">
+                                <div className="flex flex-wrap items-center gap-2 mb-2">
+                                  <span className="font-bold text-slate-900 text-sm">{c.name}</span>
+                                  <a href={`mailto:${c.email}`} className="text-xs text-cyan-600 hover:underline font-medium">{c.email}</a>
+                                  {!c.isRead && <span className="text-[10px] font-bold bg-cyan-100 text-cyan-700 px-2 py-0.5 rounded-full">NEW</span>}
+                                  <span className="text-[11px] text-slate-400">{new Date(c.createdAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
+                                </div>
+                                <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">{c.message}</p>
+                              </div>
+                              <div className="flex flex-col gap-2 flex-shrink-0">
+                                <button onClick={() => handleMarkContactRead(c._id, !c.isRead)}
+                                  className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${c.isRead ? "bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-100" : "bg-cyan-50 text-cyan-700 border-cyan-200 hover:bg-cyan-100"}`}>
+                                  {c.isRead ? "Mark Unread" : "✓ Mark Read"}
+                                </button>
+                                <button onClick={() => { setReplyingTo(c); setReplyMessage(""); setReplyResult(null); }}
+                                  className="px-3 py-1.5 rounded-lg text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 transition-all text-center">
+                                  📧 Reply
+                                </button>
+                                <button onClick={() => handleDeleteContact(c._id)} disabled={deletingContactId === c._id}
+                                  className="px-3 py-1.5 rounded-lg text-xs font-bold bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 transition-all disabled:opacity-50">
+                                  {deletingContactId === c._id ? "..." : "Delete"}
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()}
+                </div>
+              </div>
             </div>
           )}
 

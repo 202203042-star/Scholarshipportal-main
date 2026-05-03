@@ -8,6 +8,7 @@ const PUBLIC_PATHS = [
   "/api/auth",
   "/api/register",
   "/api/admin/setup",
+  "/api/contact",
   "/_next",
   "/favicon.ico",
   "/icon",

@@ -6,19 +6,21 @@ import { auth } from "@/lib/auth";
 import mongoose from "mongoose";
 
 const AbroadScholarshipSchema = new mongoose.Schema({
-  name:        { type: String, required: true },
-  provider:    { type: String, required: true },
-  country:     { type: String, required: true },
-  amount:      { type: String, required: true },
-  deadline:    { type: String, required: true },
-  eligibility: { type: String, required: true },
-  level:       { type: String, default: "Master" },
-  fields:      { type: String, default: "" },
-  bond:        { type: String, default: "No bond" },
-  applyLink:   { type: String, required: true },
-  documents:   { type: [String], default: [] },
-  tips:        { type: String, default: "" },
-  isActive:    { type: Boolean, default: true },
+  name:         { type: String, required: true },
+  provider:     { type: String, required: true },
+  country:      { type: String, required: true },
+  amount:       { type: String, required: true },
+  deadline:     { type: String, required: true },
+  eligibility:  { type: String, required: true },
+  level:        { type: String, default: "Master" },
+  fields:       { type: String, default: "" },
+  bond:         { type: String, default: "No bond" },
+  applyLink:    { type: String, required: true },
+  documents:    { type: [String], default: [] },
+  tips:         { type: String, default: "" },
+  visaProcess:  { type: String, default: "" },
+  visaDocuments:{ type: String, default: "" },
+  isActive:     { type: Boolean, default: true },
 }, { timestamps: true });
 
 const AbroadScholarship = mongoose.models.AbroadScholarship ||

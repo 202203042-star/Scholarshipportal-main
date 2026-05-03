@@ -15,6 +15,9 @@
  * Returns all unresolved monitor alerts with their change details.
  */
 
+// Vercel max function duration (seconds) — 60 on Pro, 10 on Hobby
+export const maxDuration = 60;
+
 import { NextRequest, NextResponse } from "next/server";
 import connectDB from "@/lib/mongodb";
 import Scholarship from "@/models/Scholarship";
@@ -28,11 +31,11 @@ import { auth } from "@/lib/auth";
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
-/** Fetch a URL with a 12-second timeout. Returns null on failure. */
+/** Fetch a URL with a 6-second timeout. Returns null on failure. */
 async function safeFetch(url: string): Promise<string | null> {
   try {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 12_000);
+    const timer = setTimeout(() => controller.abort(), 6_000);
     const res = await fetch(url, {
       signal: controller.signal,
       headers: {
@@ -237,11 +240,15 @@ export async function GET() {
   try {
     await connectDB();
 
-    const logs = await ScholarshipMonitorLog.find({ resolved: false })
-      .sort({ severity: 1, checkedAt: -1 }) // urgent first
+    // Active alerts = only "changed" status, unresolved
+    const logs = await ScholarshipMonitorLog.find({
+      resolved: false,
+      status: "changed",
+    })
+      .sort({ checkedAt: -1 })
       .lean();
 
-    // Sort by severity weight
+    // Sort by severity weight — urgent first
     const weight: Record<string, number> = { urgent: 0, high: 1, medium: 2, low: 3 };
     logs.sort((a, b) => (weight[a.severity] ?? 4) - (weight[b.severity] ?? 4));
 
@@ -282,7 +289,11 @@ export async function POST(req: NextRequest) {
     let warningCount = 0;
     const results: Array<{ title: string; status: MonitorStatus; changes: number }> = [];
 
-    for (const scholarship of scholarships) {
+    // Process in parallel batches of 5 for speed
+    const BATCH_SIZE = 5;
+    for (let i = 0; i < scholarships.length; i += BATCH_SIZE) {
+      const batch = scholarships.slice(i, i + BATCH_SIZE);
+      const batchResults = await Promise.all(batch.map(async (scholarship) => {
       const url = scholarship.applyLink as string;
       const sid = (scholarship._id as any).toString();
 
@@ -290,7 +301,7 @@ export async function POST(req: NextRequest) {
       const html = await safeFetch(url);
 
       if (!html) {
-        // Log as unreachable warning (no duplicate check needed — always log)
+        // Log as unreachable — auto-resolved so it goes straight to history
         await ScholarshipMonitorLog.create({
           scholarshipId: scholarship._id,
           scholarshipTitle: scholarship.title,
@@ -298,13 +309,12 @@ export async function POST(req: NextRequest) {
           status: "unreachable" as MonitorStatus,
           changes: [],
           severity: "low" as AlertSeverity,
-          resolved: false,
+          resolved: true,
+          resolvedAt: new Date(),
           checkedAt: new Date(),
           errorMessage: `Source URL unreachable: ${url}`,
         });
-        warningCount++;
-        results.push({ title: scholarship.title, status: "unreachable", changes: 0 });
-        continue;
+        return { title: scholarship.title, status: "unreachable" as MonitorStatus, changes: 0, isAlert: false, isWarning: true };
       }
 
       const text = stripHtml(html);
@@ -413,16 +423,14 @@ export async function POST(req: NextRequest) {
           resolved: true, // ok logs are auto-resolved
           checkedAt: new Date(),
         });
-        results.push({ title: scholarship.title, status: "ok", changes: 0 });
-        continue;
+        return { title: scholarship.title, status: "ok" as MonitorStatus, changes: 0, isAlert: false, isWarning: false };
       }
 
       // Duplicate guard — skip if same fields already have an open alert
       const changedFields = changes.map((c) => c.field);
       const isDuplicate = await hasUnresolvedAlert(sid, changedFields);
       if (isDuplicate) {
-        results.push({ title: scholarship.title, status: "changed", changes: 0 });
-        continue;
+        return { title: scholarship.title, status: "changed" as MonitorStatus, changes: 0, isAlert: false, isWarning: false };
       }
 
       const severity = calcSeverity(changes);
@@ -463,9 +471,16 @@ export async function POST(req: NextRequest) {
         checkedAt: new Date(),
       });
 
-      alertCount++;
-      results.push({ title: scholarship.title, status: "changed", changes: changes.length });
-    }
+      return { title: scholarship.title, status: "changed" as MonitorStatus, changes: changes.length, isAlert: true, isWarning: false };
+      })); // end Promise.all map
+
+      // Aggregate batch results
+      for (const r of batchResults) {
+        results.push({ title: r.title, status: r.status, changes: r.changes });
+        if (r.isAlert) alertCount++;
+        if (r.isWarning) warningCount++;
+      }
+    } // end batch loop
 
     return NextResponse.json({
       message: `Scan complete. ${alertCount} alert(s) generated, ${warningCount} warning(s).`,
