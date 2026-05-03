@@ -17,6 +17,27 @@ const PUBLIC_PATHS = [
   "/logout.png",
 ];
 
+async function getSessionToken(req: NextRequest) {
+  // Try all possible next-auth v5 cookie names
+  const cookieNames = [
+    "__Secure-authjs.session-token", // production HTTPS
+    "authjs.session-token",           // local HTTP
+    "__Host-authjs.session-token",    // some v5 configs
+    "next-auth.session-token",        // v4 fallback
+    "__Secure-next-auth.session-token", // v4 production
+  ];
+
+  for (const cookieName of cookieNames) {
+    const token = await getToken({
+      req,
+      secret: process.env.NEXTAUTH_SECRET,
+      cookieName,
+    });
+    if (token) return token;
+  }
+  return null;
+}
+
 export default async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
@@ -24,17 +45,7 @@ export default async function middleware(req: NextRequest) {
   const isPublic = PUBLIC_PATHS.some((p) => pathname.startsWith(p));
   if (isPublic) return NextResponse.next();
 
-  // Check JWT token
-  const token = await getToken({
-    req,
-    secret: process.env.NEXTAUTH_SECRET,
-    // next-auth v5 uses a different cookie name
-    cookieName:
-      process.env.NODE_ENV === "production"
-        ? "__Secure-authjs.session-token"
-        : "authjs.session-token",
-  });
-
+  const token = await getSessionToken(req);
   const isLoggedIn = !!token;
 
   if (!isLoggedIn) {
