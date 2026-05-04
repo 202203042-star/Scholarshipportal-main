@@ -289,6 +289,10 @@ export default function ScholarshipPage() {
   const [notifiedScholarships, setNotifiedScholarships] = useState<string[]>([]);
   const [showProfileDropdown, setShowProfileDropdown] = useState(false);
   const [showLangDropdown, setShowLangDropdown] = useState(false);
+  const [showNotifPanel, setShowNotifPanel]     = useState(false);
+  const [studentNotifs, setStudentNotifs]       = useState<{_id:string;title:string;message:string;type:string;isRead:boolean;createdAt:string}[]>([]);
+  const [unreadCount, setUnreadCount]           = useState(0);
+  const notifPanelRef = useRef<HTMLDivElement>(null);
   const profileDropdownRef = useRef<HTMLDivElement>(null);
   const langDropdownRef = useRef<HTMLDivElement>(null);
 
@@ -326,10 +330,20 @@ export default function ScholarshipPage() {
     function handleClickOutside(e: MouseEvent) {
       if (profileDropdownRef.current && !profileDropdownRef.current.contains(e.target as Node)) setShowProfileDropdown(false);
       if (langDropdownRef.current && !langDropdownRef.current.contains(e.target as Node)) setShowLangDropdown(false);
+      if (notifPanelRef.current && !notifPanelRef.current.contains(e.target as Node)) setShowNotifPanel(false);
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  // Fetch student notifications from DB
+  useEffect(() => {
+    if (status !== "authenticated") return;
+    fetch("/api/student/notifications")
+      .then(r => r.json())
+      .then(d => { setStudentNotifs(d.notifications || []); setUnreadCount(d.unreadCount || 0); })
+      .catch(() => {});
+  }, [status]);
 
   // ── Early return AFTER all hooks ────────────────────────────
   if (status === "loading" || status === "unauthenticated") {
@@ -464,12 +478,53 @@ export default function ScholarshipPage() {
                 </div>
 
                 {/* Notification bell */}
-                <button className="relative w-8 h-8 flex items-center justify-center rounded-lg border border-slate-200 bg-white hover:bg-slate-50 transition-all flex-shrink-0">
-                  <svg className="w-4 h-4 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
-                  {notifiedScholarships.length > 0 && (
-                    <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center">{notifiedScholarships.length}</span>
+                <div className="relative flex-shrink-0" ref={notifPanelRef}>
+                  <button
+                    onClick={() => {
+                      setShowNotifPanel(v => !v);
+                      if (!showNotifPanel && unreadCount > 0) {
+                        // Mark all as read when opening
+                        fetch("/api/student/notifications", { method: "PATCH" })
+                          .then(() => { setUnreadCount(0); setStudentNotifs(prev => prev.map(n => ({ ...n, isRead: true }))); })
+                          .catch(() => {});
+                      }
+                    }}
+                    className="relative w-8 h-8 flex items-center justify-center rounded-lg border border-slate-200 bg-white hover:bg-slate-50 transition-all flex-shrink-0">
+                    <svg className="w-4 h-4 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
+                    {unreadCount > 0 && (
+                      <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center">{unreadCount}</span>
+                    )}
+                  </button>
+
+                  {/* Notification Panel */}
+                  {showNotifPanel && (
+                    <div className="absolute right-0 mt-1.5 w-80 bg-white border border-slate-100 rounded-2xl shadow-2xl z-50 overflow-hidden">
+                      <div className="px-4 py-3 border-b border-slate-100" style={{ background: "linear-gradient(135deg,#1d4ed8,#4f46e5)" }}>
+                        <p className="text-white font-bold text-sm">🔔 Notifications</p>
+                      </div>
+                      <div className="max-h-80 overflow-y-auto">
+                        {studentNotifs.length === 0 ? (
+                          <div className="px-4 py-8 text-center">
+                            <p className="text-2xl mb-2">🔔</p>
+                            <p className="text-slate-400 text-sm">No notifications yet</p>
+                          </div>
+                        ) : studentNotifs.map(n => (
+                          <div key={n._id} className={`px-4 py-3 border-b border-slate-50 hover:bg-slate-50 transition-colors ${!n.isRead ? "bg-blue-50" : ""}`}>
+                            <div className="flex items-start gap-2">
+                              <span className="text-base mt-0.5">{n.type === "reply" ? "💬" : "🎓"}</span>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-semibold text-slate-800">{n.title}</p>
+                                <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">{n.message}</p>
+                                <p className="text-[10px] text-slate-400 mt-1">{new Date(n.createdAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}</p>
+                              </div>
+                              {!n.isRead && <span className="w-2 h-2 rounded-full bg-blue-500 flex-shrink-0 mt-1.5"></span>}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   )}
-                </button>
+                </div>
 
                 {/* Profile dropdown */}
                 <div className="relative flex-shrink-0" ref={profileDropdownRef}>
