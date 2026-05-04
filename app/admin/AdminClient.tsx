@@ -163,8 +163,12 @@ export default function AdminClient() {
     setContactsLoading(true);
     fetch("/api/contact")
       .then(r => r.json())
-      .then(d => { setContacts(d.contacts || []); setContactsLoading(false); })
-      .catch(() => setContactsLoading(false));
+      .then(d => {
+        if (d.error) console.error("Contact API error:", d.error);
+        setContacts(d.contacts || []);
+        setContactsLoading(false);
+      })
+      .catch(e => { console.error("Contact fetch error:", e); setContactsLoading(false); });
   };
 
   async function handleMarkContactRead(id: string, isRead: boolean) {

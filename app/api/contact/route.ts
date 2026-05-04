@@ -3,23 +3,20 @@ import connectDB from "@/lib/mongodb";
 import Contact from "@/models/Contact";
 import { getToken } from "next-auth/jwt";
 
-// Helper — try both cookie names (next-auth v5 beta inconsistency)
+// Try all possible next-auth v5 cookie names
 async function getAdminToken(req: NextRequest) {
-  // Try secure cookie first (production/HTTPS)
-  let token = await getToken({
-    req,
-    secret: process.env.NEXTAUTH_SECRET,
-    cookieName: "__Secure-authjs.session-token",
-  });
-  if (token) return token;
-
-  // Try non-secure cookie (local dev HTTP)
-  token = await getToken({
-    req,
-    secret: process.env.NEXTAUTH_SECRET,
-    cookieName: "authjs.session-token",
-  });
-  return token;
+  const cookieNames = [
+    "__Secure-authjs.session-token",
+    "authjs.session-token",
+    "__Host-authjs.session-token",
+    "next-auth.session-token",
+    "__Secure-next-auth.session-token",
+  ];
+  for (const cookieName of cookieNames) {
+    const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET, cookieName });
+    if (token) return token;
+  }
+  return null;
 }
 
 // POST — submit contact query (public, no auth needed)
