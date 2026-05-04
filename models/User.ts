@@ -19,6 +19,8 @@ export interface IUser extends Document {
   appliedScholarships?: mongoose.Types.ObjectId[];
   otp?: string;
   otpExpires?: Date;
+  resetToken?: string;
+  resetTokenExpires?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -43,6 +45,8 @@ const UserSchema = new Schema<IUser>(
     appliedScholarships: [{ type: Schema.Types.ObjectId, ref: "Scholarship" }],
     otp: { type: String, default: null },
     otpExpires: { type: Date, default: null },
+    resetToken: { type: String, default: null },
+    resetTokenExpires: { type: Date, default: null },
   },
   { timestamps: true }
 );

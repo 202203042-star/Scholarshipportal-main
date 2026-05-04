@@ -451,7 +451,12 @@ function LoginForm() {
           </form>
 
           {role === "student" && (
-            <div className="mt-6 pt-5 border-t border-gray-100 text-center">
+            <div className="mt-6 pt-5 border-t border-gray-100 text-center space-y-3">
+              <div>
+                <Link href="/forgot-password" className="text-sm text-gray-500 hover:text-blue-600 font-medium">
+                  Forgot your password?
+                </Link>
+              </div>
               <p className="text-sm text-gray-500">
                 Don't have an account?{" "}
                 <Link href="/register" className="text-blue-600 font-semibold hover:text-blue-700">Create account</Link>
